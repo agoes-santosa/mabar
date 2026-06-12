@@ -118,7 +118,7 @@
 
   .bg-photo-btn { display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 12px; border: 1.5px dashed #d0d0cc; background: none; cursor: pointer; width: 100%; font-size: 15px; color: #666; }
   .bg-preview { width: 52px; height: 40px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
-  .summary-bg-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.52); border-radius: 16px; }
+  .summary-bg-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.38); border-radius: 16px; }
   .summary-card-inner { position: relative; z-index: 1; }
   .summary-card.has-bg { position: relative; overflow: hidden; color: #fff; }
   .summary-card.has-bg .session-title-display,
@@ -251,7 +251,7 @@
   <div id="view-summary" style="display:none">
     <div id="summary-capture" style="background:#f5f5f3;padding:4px 0 8px">
       <div class="summary-card" id="summary-card-el">
-        <img id="summary-bg-img" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:16px" alt="" />
+        <img id="summary-bg-img" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:16px;filter:blur(3px);transform:scale(1.05)" alt="" />
         <div id="summary-bg-overlay" class="summary-bg-overlay" style="display:none"></div>
         <div class="summary-card-inner">
           <div style="text-align:center;margin-bottom:1rem">
@@ -627,7 +627,7 @@ function submitRound() {
   document.getElementById('round-banner-text').textContent = `Round ${state.round} saved! Starting round ${state.round+1}…`;
   document.getElementById('round-banner').style.display = 'flex';
   save();
-  setTimeout(() => generateRound(), 800);
+  setTimeout(() => { generateRound(); window.scrollTo({ top: 0, behavior: 'smooth' }); }, 800);
 }
 
 function renderLeaderboard() {
