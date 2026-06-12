@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Tennis Mabar App</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; font-size: 16px; }
+  .app { max-width: 600px; margin: 0 auto; padding: 0 1rem 5rem; }
+
+  header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 0 1.25rem; }
+  header h1 { font-size: 1.1rem; font-weight: 700; }
+  .badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; }
+  .badge-round { background: #d6f0e0; color: #166534; }
+  .badge-setup { background: #fef3c7; color: #92400e; }
+
+  .card { background: #fff; border-radius: 14px; border: 0.5px solid #e5e5e0; padding: 1rem 1.1rem; margin-bottom: .875rem; }
+  .card-title { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .75rem; }
+
+  .player-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid #f0f0ec; min-height: 48px; }
+  .player-row:last-child { border-bottom: none; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: #e8e4fe; color: #5b4fcf; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; overflow: hidden; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .avatar.absent { background: #f0f0ec; color: #999; }
+  .player-name { flex: 1; font-size: 15px; }
+  .player-score { font-size: 15px; font-weight: 700; min-width: 32px; text-align: right; }
+  .btn-icon { background: none; border: none; cursor: pointer; color: #bbb; padding: 8px; border-radius: 8px; font-size: 18px; line-height: 1; min-width: 36px; min-height: 36px; display: flex; align-items: center; justify-content: center; }
+
+  input[type="text"] { border: 0.5px solid #d0d0cc; border-radius: 10px; padding: 12px 14px; font-size: 16px; width: 100%; outline: none; background: #fff; -webkit-appearance: none; }
+  input[type="text"]:focus { border-color: #7c6ff7; box-shadow: 0 0 0 3px rgba(124,111,247,.12); }
+  input[type="number"] { border: 0.5px solid #d0d0cc; border-radius: 10px; padding: 0; font-size: 22px; font-weight: 700; width: 60px; height: 56px; text-align: center; outline: none; background: #fafaf8; -webkit-appearance: none; appearance: none; }
+  input[type="number"]:focus { border-color: #7c6ff7; box-shadow: 0 0 0 3px rgba(124,111,247,.12); }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+  .btn { border: none; border-radius: 12px; padding: 14px 20px; font-size: 16px; font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s; min-height: 52px; display: inline-flex; align-items: center; justify-content: center; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #5b4fcf; color: #fff; }
+  .btn-secondary { background: #f0f0ec; color: #333; }
+  .btn-danger { background: #fee2e2; color: #991b1b; }
+  .btn-sm { padding: 10px 16px; font-size: 14px; min-height: 44px; }
+  .btn-full { width: 100%; }
+
+  .sticky-actions { position: fixed; bottom: 0; left: 0; right: 0; padding: .875rem 1rem calc(.875rem + env(safe-area-inset-bottom)); background: rgba(245,245,243,0.95); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 0.5px solid #e5e5e0; z-index: 10; }
+  .sticky-inner { max-width: 600px; margin: 0 auto; display: flex; gap: 8px; }
+
+  .court-card { background: #fff; border-radius: 14px; border: 0.5px solid #e5e5e0; padding: 1rem 1.1rem; margin-bottom: .875rem; }
+  .court-label { font-size: 12px; font-weight: 700; color: #5b4fcf; text-transform: uppercase; letter-spacing: .07em; }
+  .vs-row { display: flex; align-items: center; gap: 6px; margin-top: .625rem; }
+  .team { flex: 1; min-width: 0; }
+  .team-names { font-size: 14px; font-weight: 600; }
+  .team-names span { display: block; padding: 3px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .score-box { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .score-sep { font-size: 14px; font-weight: 700; color: #ccc; }
+
+  .leaderboard-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid #f0f0ec; min-height: 52px; }
+  .leaderboard-row:last-child { border-bottom: none; }
+  .rank { font-size: 13px; font-weight: 700; color: #bbb; min-width: 22px; }
+  .rank-1 { color: #d97706; }
+  .rank-2 { color: #6b7280; }
+  .rank-3 { color: #92400e; }
+
+  .add-row { display: flex; gap: 8px; margin-top: .875rem; }
+  .section-note { font-size: 12px; color: #aaa; margin-top: .5rem; }
+
+  .tag { font-size: 11px; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+  .tag-absent { background: #f3f4f6; color: #6b7280; }
+  .tag-rest { background: #fef3c7; color: #92400e; }
+
+  .empty-state { text-align: center; padding: 2rem 0; color: #bbb; font-size: 15px; }
+  .history-item { font-size: 13px; color: #888; padding: 5px 0; border-bottom: 0.5px solid #f5f5f3; }
+  .history-item:last-child { border-bottom: none; }
+
+  .tabs { display: flex; gap: 4px; background: #ebebea; border-radius: 12px; padding: 3px; margin-bottom: 1rem; }
+  .tab { flex: 1; text-align: center; padding: 10px 8px; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 10px; border: none; background: none; color: #888; min-height: 44px; }
+  .tab.active { background: #fff; color: #1a1a1a; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+
+  .skip-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 11px 0; border-bottom: 0.5px solid #f0f0ec; user-select: none; min-height: 48px; }
+  .skip-toggle:last-child { border-bottom: none; }
+  .skip-toggle input { accent-color: #5b4fcf; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; }
+  .skip-toggle span { font-size: 15px; flex: 1; }
+
+  .round-banner { background: #d6f0e0; border: 0.5px solid #a7f3d0; border-radius: 12px; padding: 12px 16px; margin-bottom: 1rem; font-size: 14px; color: #166534; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+  .court-counter { display: flex; align-items: center; gap: 16px; }
+  .counter-btn { width: 44px; height: 44px; border-radius: 50%; border: 0.5px solid #d0d0cc; background: #fff; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 400; color: #333; }
+  .counter-val { font-size: 28px; font-weight: 700; min-width: 32px; text-align: center; }
+
+  .summary-card { background: #fff; border-radius: 16px; border: 0.5px solid #e5e5e0; padding: 1.5rem 1.25rem; margin-bottom: 1rem; }
+  .podium { display: flex; align-items: flex-end; justify-content: center; gap: 8px; margin: 1.5rem 0; }
+  .podium-slot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .podium-block { width: 80px; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  .podium-block-1 { height: 72px; background: #fef3c7; color: #d97706; }
+  .podium-block-2 { height: 52px; background: #f1f5f9; color: #64748b; }
+  .podium-block-3 { height: 40px; background: #fdf4e7; color: #92400e; }
+  .podium-name { font-size: 13px; font-weight: 600; text-align: center; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .podium-pts { font-size: 11px; color: #888; }
+  .podium-avatar { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; overflow: hidden; flex-shrink: 0; }
+  .podium-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .podium-avatar-1 { background: #fef3c7; color: #d97706; border: 2px solid #fbbf24; }
+  .podium-avatar-2 { background: #f1f5f9; color: #475569; border: 2px solid #cbd5e1; }
+  .podium-avatar-3 { background: #fdf4e7; color: #92400e; border: 2px solid #d9b99b; }
+  .summary-stat { text-align: center; }
+  .summary-stat-val { font-size: 28px; font-weight: 700; }
+  .summary-stat-label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+  .summary-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid #f0f0ec; }
+  .summary-row:last-child { border-bottom: none; }
+  .medal { font-size: 16px; min-width: 22px; text-align: center; }
+  .export-actions { display: flex; gap: 8px; }
+  .btn-export { background: #1a1a1a; color: #fff; }
+  .btn-share { background: #0ea5e9; color: #fff; }
+  .session-title-display { font-size: 22px; font-weight: 800; margin-top: 4px; }
+  .session-date { font-size: 12px; color: #999; margin-top: 2px; }
+  .sum-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; background: #e8e4fe; color: #5b4fcf; }
+  .sum-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  .bg-photo-btn { display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 12px; border: 1.5px dashed #d0d0cc; background: none; cursor: pointer; width: 100%; font-size: 15px; color: #666; }
+  .bg-preview { width: 52px; height: 40px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+  .summary-bg-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.52); border-radius: 16px; }
+  .summary-card-inner { position: relative; z-index: 1; }
+  .summary-card.has-bg { position: relative; overflow: hidden; color: #fff; }
+  .summary-card.has-bg .session-title-display,
+  .summary-card.has-bg .summary-stat-val,
+  .summary-card.has-bg .podium-name { color: #fff; }
+  .summary-card.has-bg .session-date,
+  .summary-card.has-bg .podium-pts,
+  .summary-card.has-bg .summary-stat-label { color: rgba(255,255,255,0.65); }
+  .summary-card.has-bg .summary-row { border-bottom-color: rgba(255,255,255,0.12); color: #fff; }
+  .summary-card.has-bg [style*="color:#aaa"] { color: rgba(255,255,255,0.5) !important; }
+  .summary-card.has-bg [style*="color:#ccc"] { color: rgba(255,255,255,0.3) !important; }
+  .summary-card.has-bg [style*="font-size:15px;font-weight:700"] { color: #fff; }
+  .summary-card.has-bg [style*="font-size:14px"] { color: rgba(255,255,255,0.9); }
+  .summary-card.has-bg [style*="height:0.5px;background:#f0f0ec"] { background: rgba(255,255,255,0.15) !important; }
+  .summary-card.has-bg .sum-avatar { background: rgba(255,255,255,0.2); color: #fff; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🎾 Tennis Mabar App</h1>
+    <span class="badge badge-setup" id="phase-badge">Setup</span>
+  </header>
+
+  <div id="tab-bar" class="tabs" style="display:none">
+    <button class="tab active" onclick="switchTab('courts')" id="tab-courts">Courts</button>
+    <button class="tab" onclick="switchTab('standings')" id="tab-standings">Standings</button>
+    <button class="tab" onclick="switchTab('players')" id="tab-players">Players</button>
+  </div>
+
+  <!-- SETUP VIEW -->
+  <div id="view-setup">
+    <div class="card">
+      <div class="card-title">Session name</div>
+      <input type="text" id="session-name-input" placeholder="e.g. Saturday Morning" />
+    </div>
+
+    <div class="card">
+      <div class="card-title">Number of courts</div>
+      <div class="court-counter">
+        <button class="counter-btn" onclick="changeCourts(-1)">−</button>
+        <span class="counter-val" id="courts-count-display">1</span>
+        <button class="counter-btn" onclick="changeCourts(1)">+</button>
+        <span style="font-size:14px;color:#888">available</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Players</div>
+      <div id="player-list-setup"></div>
+      <div class="add-row">
+        <input type="text" id="new-player-input" placeholder="Player name" onkeydown="if(event.key==='Enter')addPlayer()" />
+        <button class="btn btn-primary btn-sm" onclick="addPlayer()">Add</button>
+      </div>
+    </div>
+    <div id="start-error" style="color:#dc2626;font-size:14px;margin-bottom:.75rem;display:none"></div>
+    <button class="btn btn-primary btn-full" onclick="startGame()">Start game</button>
+    <div style="height:.5rem"></div>
+  </div>
+
+  <!-- GAME VIEW -->
+  <div id="view-game" style="display:none">
+    <div id="courts-view">
+      <div id="round-banner" style="display:none" class="round-banner"><span class="dot"></span><span id="round-banner-text"></span></div>
+
+      <div class="card" style="margin-bottom:.875rem">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#5b4fcf;text-transform:uppercase;letter-spacing:.06em">Round</div>
+            <div style="font-size:26px;font-weight:800;line-height:1.1" id="round-num">1</div>
+          </div>
+          <div style="text-align:center;font-size:13px;font-weight:600;color:#aaa;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="game-session-name"></div>
+          <div style="text-align:right">
+            <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em">Points</div>
+            <div style="font-size:26px;font-weight:800;line-height:1.1" id="total-points">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="courts-list"></div>
+
+      <div class="card" id="sitting-out-card" style="display:none">
+        <div class="card-title">Sitting out this round</div>
+        <div id="sitting-out-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Skip next round</div>
+        <div id="absent-toggles"></div>
+        <div style="margin-top:.75rem;padding-top:.75rem;border-top:0.5px solid #f0f0ec">
+          <button class="btn btn-secondary btn-sm" style="width:100%;font-size:14px" onclick="toggleQuickAdd()">＋ Player joining?</button>
+          <div id="quick-add-row" style="display:none;margin-top:8px;display:none">
+            <div class="add-row" style="margin-top:0">
+              <input type="text" id="quick-add-input" placeholder="New player name" onkeydown="if(event.key==='Enter')quickAddPlayer()" style="font-size:16px" />
+              <button class="btn btn-primary btn-sm" onclick="quickAddPlayer()">Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:.5rem"></div>
+    </div>
+
+    <div id="standings-view" style="display:none">
+      <div class="card">
+        <div class="card-title">Standings</div>
+        <div id="leaderboard-list"></div>
+      </div>
+      <div class="card" id="history-card" style="display:none">
+        <div class="card-title">Round history</div>
+        <div id="history-list"></div>
+      </div>
+    </div>
+
+    <div id="players-view" style="display:none">
+      <div class="card">
+        <div class="card-title">Player roster</div>
+        <div id="player-list-game"></div>
+        <div class="add-row">
+          <input type="text" id="new-player-game-input" placeholder="Add player mid-game" onkeydown="if(event.key==='Enter')addPlayerMidGame()" />
+          <button class="btn btn-primary btn-sm" onclick="addPlayerMidGame()">Add</button>
+        </div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="resetGame()">Reset / new game</button>
+      <div style="height:.5rem"></div>
+    </div>
+  </div>
+
+  <!-- SUMMARY VIEW -->
+  <div id="view-summary" style="display:none">
+    <div id="summary-capture" style="background:#f5f5f3;padding:4px 0 8px">
+      <div class="summary-card" id="summary-card-el">
+        <img id="summary-bg-img" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:16px" alt="" />
+        <div id="summary-bg-overlay" class="summary-bg-overlay" style="display:none"></div>
+        <div class="summary-card-inner">
+          <div style="text-align:center;margin-bottom:1rem">
+            <div style="font-size:24px">🎾</div>
+            <div class="session-title-display" id="summary-session-name">Session complete</div>
+            <div class="session-date" id="summary-date"></div>
+          </div>
+          <div style="display:flex;justify-content:center;gap:2rem;margin-bottom:1.5rem">
+            <div class="summary-stat"><div class="summary-stat-val" id="sum-rounds">0</div><div class="summary-stat-label">Rounds</div></div>
+            <div class="summary-stat"><div class="summary-stat-val" id="sum-players">0</div><div class="summary-stat-label">Players</div></div>
+            <div class="summary-stat"><div class="summary-stat-val" id="sum-points">0</div><div class="summary-stat-label">Total pts</div></div>
+          </div>
+          <div class="podium" id="summary-podium"></div>
+          <div style="height:0.5px;background:#f0f0ec;margin:1rem 0"></div>
+          <div id="summary-full-board"></div>
+          <div style="text-align:center;margin-top:1rem;font-size:10px;color:#ccc;letter-spacing:.05em">Tennis Mabar App by Agoes Santosa</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:.875rem">
+      <div class="card-title">Background photo</div>
+      <button class="bg-photo-btn" onclick="document.getElementById('bg-file-input').click()">
+        <img id="bg-preview-thumb" class="bg-preview" style="display:none" alt="preview" />
+        <span id="bg-photo-label">📷  Add a background photo</span>
+      </button>
+      <div id="bg-remove-row" style="display:none;margin-top:10px">
+        <button class="btn btn-secondary btn-sm" onclick="removeBgPhoto()">Remove photo</button>
+      </div>
+    </div>
+
+    <div class="export-actions" style="margin-bottom:.5rem">
+      <button class="btn btn-export" style="flex:1" onclick="exportImage(event)">Download image</button>
+      <button class="btn btn-share" id="btn-share" style="flex:1;display:none" onclick="shareImage(event)">Share</button>
+    </div>
+    <button class="btn btn-secondary btn-full" onclick="resetGame()">New game</button>
+    <div style="height:.5rem"></div>
+  </div>
+</div>
+
+<!-- Sticky bottom action bar (game view only) -->
+<div class="sticky-actions" id="sticky-bar" style="display:none">
+  <div class="sticky-inner">
+    <button class="btn btn-primary" style="flex:1" onclick="submitRound()">Save &amp; next round</button>
+    <button class="btn btn-secondary btn-sm" onclick="generateRound(false)" style="min-width:80px">Reshuffle</button>
+    <button class="btn btn-sm" onclick="finishSession()" style="min-width:44px;background:#fee2e2;color:#991b1b;padding:10px 12px">End</button>
+  </div>
+</div>
+
+<input type="file" id="bg-file-input" accept="image/*" style="display:none" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+let setupCourts = 1;
+
+let state = {
+  players: [],
+  round: 0,
+  maxCourts: 1,
+  sessionName: '',
+  bgPhoto: null,
+  courts: [],
+  sittingOut: [],
+  history: [],
+  partnerHistory: {},
+  absentNext: new Set()
+};
+
+function save() {
+  try { localStorage.setItem('mabar_v1', JSON.stringify(state, (k,v) => v instanceof Set ? [...v] : v)); } catch(e){}
+}
+function load() {
+  try {
+    const d = localStorage.getItem('mabar_v1');
+    if (d) {
+      const parsed = JSON.parse(d);
+      parsed.absentNext = new Set(parsed.absentNext || []);
+      parsed.partnerHistory = parsed.partnerHistory || {};
+      state = parsed;
+    }
+  } catch(e){}
+}
+
+function initials(name) {
+  return name.trim().split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2) || '?';
+}
+
+function avatarHtml(player, size=36, fontSize=13) {
+  const style = `width:${size}px;height:${size}px;font-size:${fontSize}px`;
+  return `<div class="avatar" style="${style}">${initials(player ? player.name : '?')}</div>`;
+}
+
+function changeCourts(delta) {
+  setupCourts = Math.max(1, Math.min(6, setupCourts + delta));
+  document.getElementById('courts-count-display').textContent = setupCourts;
+}
+
+function renderSetup() {
+  const list = document.getElementById('player-list-setup');
+  if (!state.players.length) { list.innerHTML = '<div class="empty-state">No players yet</div>'; return; }
+  list.innerHTML = state.players.map((p,i) => `
+    <div class="player-row">
+      ${avatarHtml(p)}
+      <div class="player-name">${p.name}</div>
+      <button class="btn-icon" onclick="removePlayerSetup(${i})">✕</button>
+    </div>`).join('');
+}
+
+function addPlayer() {
+  const inp = document.getElementById('new-player-input');
+  const name = inp.value.trim();
+  if (!name) return;
+  state.players.push({ name, score: 0, rounds: 0, courtsPlayed: 0, lastSatOutRound: 0 });
+  inp.value = '';
+  inp.focus();
+  renderSetup();
+  save();
+}
+
+function removePlayerSetup(i) {
+  state.players.splice(i, 1);
+  renderSetup();
+  save();
+}
+
+function startGame() {
+  const err = document.getElementById('start-error');
+  if (state.players.length < 4) { err.textContent = 'Need at least 4 players to start.'; err.style.display='block'; return; }
+  err.style.display = 'none';
+  state.maxCourts = setupCourts;
+  state.sessionName = document.getElementById('session-name-input').value.trim();
+  document.getElementById('view-setup').style.display = 'none';
+  document.getElementById('view-game').style.display = 'block';
+  document.getElementById('tab-bar').style.display = 'flex';
+  document.getElementById('sticky-bar').style.display = 'block';
+  document.getElementById('phase-badge').textContent = 'Round 1';
+  document.getElementById('phase-badge').className = 'badge badge-round';
+  document.getElementById('game-session-name').textContent = state.sessionName;
+  generateRound();
+}
+
+function activePlayers() {
+  return state.players.filter(p => !state.absentNext.has(p.name));
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function pairKey(a, b) {
+  return [a, b].sort().join('|');
+}
+
+function getPairCount(a, b) {
+  return state.partnerHistory[pairKey(a, b)] || 0;
+}
+
+function smartSelectPlayers(active, numSlots) {
+  // Group by courtsPlayed, shuffle within each group, then flatten in order
+  // Those with fewer courts played get priority. Tie-break: sat out most recently first.
+  const groups = {};
+  active.forEach(p => {
+    const k = p.courtsPlayed || 0;
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(p);
+  });
+  const result = [];
+  Object.keys(groups).sort((a,b) => a-b).forEach(k => {
+    // Within same courtsPlayed tier, prioritize those who sat out more recently
+    const tier = groups[k].sort((a,b) => (b.lastSatOutRound||0) - (a.lastSatOutRound||0));
+    // Add a tiny shuffle within ties of the same (courtsPlayed, lastSatOutRound) to avoid rigid patterns
+    let i = 0;
+    while (i < tier.length) {
+      let j = i;
+      while (j < tier.length && tier[j].lastSatOutRound === tier[i].lastSatOutRound) j++;
+      const slice = tier.slice(i, j);
+      shuffle(slice).forEach((p, idx) => { tier[i + idx] = p; });
+      i = j;
+    }
+    result.push(...tier);
+  });
+  return result;
+}
+
+function formBalancedCourts(players, numCourts) {
+  // Greedy partner assignment: minimize repeat partnerships
+  // For each open slot, pick the best available partner for the first unpaired player
+  const remaining = [...players];
+  const pairs = [];
+
+  while (remaining.length >= 2) {
+    const first = remaining.shift();
+    let bestIdx = 0;
+    let bestScore = Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const score = getPairCount(first.name, remaining[i].name);
+      if (score < bestScore) { bestScore = score; bestIdx = i; }
+    }
+    const partner = remaining.splice(bestIdx, 1)[0];
+    pairs.push([first, partner]);
+  }
+
+  // Pair up pairs into courts: also try to avoid repeat opponents (secondary concern)
+  const courts = [];
+  for (let i = 0; i + 1 < pairs.length; i += 2) {
+    courts.push({
+      team1: [pairs[i][0].name, pairs[i][1].name],
+      team2: [pairs[i+1][0].name, pairs[i+1][1].name],
+      score1: '', score2: ''
+    });
+  }
+  return courts;
+}
+
+function generateRound(advance = true) {
+  if (advance) state.round++;
+  document.getElementById('phase-badge').textContent = 'Round ' + state.round;
+  document.getElementById('round-num').textContent = state.round;
+  document.getElementById('round-banner').style.display = 'none';
+
+  const active = activePlayers();
+  const maxByPlayers = Math.floor(active.length / 4);
+  const numCourts = Math.min(maxByPlayers, state.maxCourts);
+  const numPlaying = numCourts * 4;
+
+  const prioritized = smartSelectPlayers(active, numPlaying);
+  const toPlay = prioritized.slice(0, numPlaying);
+  const sitting = prioritized.slice(numPlaying);
+
+  state.courts = formBalancedCourts(toPlay, numCourts);
+  state.sittingOut = sitting.map(p => p.name);
+
+  // Mark sit-out round so priority works next time
+  sitting.forEach(p => {
+    const pl = state.players.find(x => x.name === p.name);
+    if (pl) pl.lastSatOutRound = state.round;
+  });
+
+  renderCourts();
+  renderAbsentToggles();
+  save();
+}
+
+function renderCourts() {
+  const list = document.getElementById('courts-list');
+  list.innerHTML = state.courts.map((c, i) => `
+    <div class="court-card">
+      <span class="court-label">Court ${i+1}</span>
+      <div class="vs-row">
+        <div class="team">
+          <div class="team-names">
+            <span>${c.team1[0]}</span>
+            <span style="color:#888;font-weight:500">${c.team1[1]}</span>
+          </div>
+        </div>
+        <div class="score-box">
+          <input type="number" min="0" max="99" value="${c.score1}" placeholder="0"
+            oninput="state.courts[${i}].score1=this.value;updateTotal()" inputmode="numeric" />
+          <span class="score-sep">—</span>
+          <input type="number" min="0" max="99" value="${c.score2}" placeholder="0"
+            oninput="state.courts[${i}].score2=this.value;updateTotal()" inputmode="numeric" />
+        </div>
+        <div class="team" style="text-align:right">
+          <div class="team-names">
+            <span>${c.team2[0]}</span>
+            <span style="color:#888;font-weight:500">${c.team2[1]}</span>
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  const soCard = document.getElementById('sitting-out-card');
+  const soList = document.getElementById('sitting-out-list');
+  if (state.sittingOut.length) {
+    soCard.style.display = 'block';
+    soList.innerHTML = state.sittingOut.map(n => {
+      const p = state.players.find(x=>x.name===n);
+      return `<div class="player-row">
+        ${avatarHtml(p)}
+        <div class="player-name">${n}</div>
+        <span class="tag tag-rest">Resting</span>
+      </div>`;
+    }).join('');
+  } else {
+    soCard.style.display = 'none';
+  }
+  updateTotal();
+}
+
+function updateTotal() {
+  const total = state.courts.reduce((sum, c) => sum + (parseInt(c.score1)||0) + (parseInt(c.score2)||0), 0);
+  document.getElementById('total-points').textContent = total;
+}
+
+function renderAbsentToggles() {
+  const container = document.getElementById('absent-toggles');
+  container.innerHTML = state.players.map(p => `
+    <label class="skip-toggle">
+      <input type="checkbox" ${state.absentNext.has(p.name)?'checked':''} onchange="toggleAbsent('${p.name}',this.checked)" />
+      <span>${p.name}</span>
+      ${state.absentNext.has(p.name)?'<span class="tag tag-absent">Absent</span>':''}
+    </label>`).join('');
+}
+
+function toggleQuickAdd() {
+  const row = document.getElementById('quick-add-row');
+  const visible = row.style.display === 'block';
+  row.style.display = visible ? 'none' : 'block';
+  if (!visible) setTimeout(() => document.getElementById('quick-add-input').focus(), 50);
+}
+
+function quickAddPlayer() {
+  const inp = document.getElementById('quick-add-input');
+  const name = inp.value.trim();
+  if (!name) return;
+  if (state.players.find(p => p.name === name)) { alert('Player already exists'); return; }
+  state.players.push({ name, score: 0, rounds: 0, courtsPlayed: 0, lastSatOutRound: state.round });
+  inp.value = '';
+  document.getElementById('quick-add-row').style.display = 'none';
+  renderAbsentToggles();
+  renderLeaderboard();
+  save();
+  const banner = document.getElementById('round-banner');
+  document.getElementById('round-banner-text').textContent = `${name} added — they'll join the next round.`;
+  banner.style.display = 'flex';
+}
+
+function toggleAbsent(name, checked) {
+  if (checked) state.absentNext.add(name); else state.absentNext.delete(name);
+  renderAbsentToggles();
+  save();
+}
+
+function submitRound() {
+  let valid = true;
+  state.courts.forEach(c => { if (c.score1==='' || c.score2==='') valid = false; });
+  if (!valid && state.courts.length) {
+    if (!confirm('Some scores are empty. Save anyway?')) return;
+  }
+
+  const roundSummary = [];
+  state.courts.forEach(c => {
+    const s1 = parseInt(c.score1) || 0;
+    const s2 = parseInt(c.score2) || 0;
+    c.team1.forEach(n => {
+      const p = state.players.find(x=>x.name===n);
+      if (p) { p.score += s1; p.rounds++; p.courtsPlayed = (p.courtsPlayed||0)+1; }
+    });
+    c.team2.forEach(n => {
+      const p = state.players.find(x=>x.name===n);
+      if (p) { p.score += s2; p.rounds++; p.courtsPlayed = (p.courtsPlayed||0)+1; }
+    });
+    // Track partner pairings
+    const k1 = pairKey(c.team1[0], c.team1[1]);
+    const k2 = pairKey(c.team2[0], c.team2[1]);
+    state.partnerHistory[k1] = (state.partnerHistory[k1]||0) + 1;
+    state.partnerHistory[k2] = (state.partnerHistory[k2]||0) + 1;
+    roundSummary.push(`${c.team1.join(' & ')} ${s1}–${s2} ${c.team2.join(' & ')}`);
+  });
+  state.sittingOut.forEach(n => {
+    const p = state.players.find(x=>x.name===n);
+    if (p) p.rounds++;
+  });
+
+  state.history.unshift({ round: state.round, courts: roundSummary });
+  renderLeaderboard();
+  renderHistory();
+
+  document.getElementById('round-banner-text').textContent = `Round ${state.round} saved! Starting round ${state.round+1}…`;
+  document.getElementById('round-banner').style.display = 'flex';
+  save();
+  setTimeout(() => generateRound(), 800);
+}
+
+function renderLeaderboard() {
+  const sorted = [...state.players].sort((a,b) => b.score - a.score);
+  const list = document.getElementById('leaderboard-list');
+  if (!sorted.length) { list.innerHTML = '<div class="empty-state">No scores yet</div>'; return; }
+  list.innerHTML = sorted.map((p, i) => {
+    const rankClass = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank';
+    return `<div class="leaderboard-row">
+      <span class="rank ${rankClass}">${i+1}</span>
+      ${avatarHtml(p, 32, 12)}
+      <span class="player-name">${p.name}</span>
+      <span style="font-size:13px;color:#bbb;margin-right:6px">${p.courtsPlayed||0} played</span>
+      <span class="player-score">${p.score}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderHistory() {
+  const card = document.getElementById('history-card');
+  const list = document.getElementById('history-list');
+  if (!state.history.length) { card.style.display='none'; return; }
+  card.style.display = 'block';
+  list.innerHTML = state.history.map(h =>
+    `<div style="margin-bottom:.625rem">
+      <div style="font-size:11px;font-weight:700;color:#5b4fcf;margin-bottom:2px">Round ${h.round}</div>
+      ${h.courts.map(c=>`<div class="history-item">${c}</div>`).join('')}
+    </div>`
+  ).join('');
+}
+
+function addPlayerMidGame() {
+  const inp = document.getElementById('new-player-game-input');
+  const name = inp.value.trim();
+  if (!name) return;
+  if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
+  state.players.push({ name, score: 0, rounds: 0, courtsPlayed: 0, lastSatOutRound: 0 });
+  inp.value = '';
+  renderPlayerListGame();
+  renderAbsentToggles();
+  renderLeaderboard();
+  save();
+}
+
+function removePlayerGame(name) {
+  if (!confirm(`Remove ${name}? Their score history will be lost.`)) return;
+  state.players = state.players.filter(p=>p.name!==name);
+  state.absentNext.delete(name);
+  state.courts.forEach(c=>{
+    c.team1 = c.team1.filter(n=>n!==name);
+    c.team2 = c.team2.filter(n=>n!==name);
+  });
+  state.sittingOut = state.sittingOut.filter(n=>n!==name);
+  renderPlayerListGame();
+  renderCourts();
+  renderAbsentToggles();
+  renderLeaderboard();
+  save();
+}
+
+function renderPlayerListGame() {
+  const list = document.getElementById('player-list-game');
+  list.innerHTML = state.players.map(p => `
+    <div class="player-row">
+      ${avatarHtml(p)}
+      <div class="player-name">${p.name}</div>
+      <span class="player-score">${p.score} pts</span>
+      <button class="btn-icon" onclick="removePlayerGame('${p.name}')">✕</button>
+    </div>`).join('');
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.getElementById('courts-view').style.display = tab==='courts'?'block':'none';
+  document.getElementById('standings-view').style.display = tab==='standings'?'block':'none';
+  document.getElementById('players-view').style.display = tab==='players'?'block':'none';
+  document.getElementById('sticky-bar').style.display = tab==='courts'?'block':'none';
+  if (tab==='standings') { renderLeaderboard(); renderHistory(); }
+  if (tab==='players') renderPlayerListGame();
+}
+
+function finishSession() {
+  if (!confirm('End this session and go to the summary?')) return;
+  document.getElementById('view-game').style.display = 'none';
+  document.getElementById('tab-bar').style.display = 'none';
+  document.getElementById('sticky-bar').style.display = 'none';
+  document.getElementById('phase-badge').textContent = 'Finished';
+  document.getElementById('phase-badge').className = 'badge badge-setup';
+  document.getElementById('view-summary').style.display = 'block';
+  renderSummary();
+}
+
+function renderSummary() {
+  const sorted = [...state.players].sort((a,b) => b.score - a.score);
+  const totalPts = sorted.reduce((s,p) => s+p.score, 0);
+  const now = new Date();
+  document.getElementById('summary-session-name').textContent = state.sessionName || 'Session complete';
+  document.getElementById('summary-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  document.getElementById('sum-rounds').textContent = state.history.length;
+  document.getElementById('sum-players').textContent = sorted.length;
+  document.getElementById('sum-points').textContent = totalPts;
+
+  const podiumOrder = [sorted[1], sorted[0], sorted[2]].filter(Boolean);
+  const avatarClass = ['podium-avatar-2','podium-avatar-1','podium-avatar-3'];
+  const blockClass = ['podium-block-2','podium-block-1','podium-block-3'];
+  const medals = ['🥈','🥇','🥉'];
+  document.getElementById('summary-podium').innerHTML = podiumOrder.map((p, i) =>
+    `<div class="podium-slot">
+      <div class="podium-avatar ${avatarClass[i]}">${initials(p.name)}</div>
+      <div class="podium-name">${p.name}</div>
+      <div class="podium-pts">${p.score} pts</div>
+      <div class="podium-block ${blockClass[i]}">${medals[i]}</div>
+    </div>`
+  ).join('');
+
+  const medals2 = ['🥇','🥈','🥉'];
+  document.getElementById('summary-full-board').innerHTML = sorted.map((p,i) =>
+    `<div class="summary-row">
+      <span class="medal">${medals2[i]||''}</span>
+      <div class="sum-avatar">${initials(p.name)}</div>
+      <span style="flex:1;font-size:14px">${p.name}</span>
+      <span style="font-size:12px;color:#aaa;margin-right:8px">${p.courtsPlayed||0} played</span>
+      <span style="font-size:15px;font-weight:700">${p.score}</span>
+    </div>`
+  ).join('');
+
+  applyBgPhoto();
+  if (navigator.share || navigator.canShare) document.getElementById('btn-share').style.display = 'flex';
+}
+
+function applyBgPhoto() {
+  const card = document.getElementById('summary-card-el');
+  const bgImg = document.getElementById('summary-bg-img');
+  const overlay = document.getElementById('summary-bg-overlay');
+  const thumb = document.getElementById('bg-preview-thumb');
+  const label = document.getElementById('bg-photo-label');
+  const removeRow = document.getElementById('bg-remove-row');
+  if (state.bgPhoto) {
+    bgImg.src = state.bgPhoto; bgImg.style.display = 'block';
+    overlay.style.display = 'block'; card.classList.add('has-bg');
+    thumb.src = state.bgPhoto; thumb.style.display = 'block';
+    label.textContent = 'Change background photo';
+    removeRow.style.display = 'block';
+  } else {
+    bgImg.src = ''; bgImg.style.display = 'none';
+    overlay.style.display = 'none'; card.classList.remove('has-bg');
+    thumb.style.display = 'none';
+    label.textContent = '📷  Add a background photo';
+    removeRow.style.display = 'none';
+  }
+}
+
+document.getElementById('bg-file-input').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxW = 1200, scale = Math.min(1, maxW / img.width);
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      state.bgPhoto = canvas.toDataURL('image/jpeg', 0.85);
+      cachedCanvas = null; save(); applyBgPhoto();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+function removeBgPhoto() {
+  state.bgPhoto = null; cachedCanvas = null; save(); applyBgPhoto();
+}
+
+let cachedCanvas = null;
+async function getCanvas() {
+  if (cachedCanvas) return cachedCanvas;
+  const el = document.getElementById('summary-capture');
+  cachedCanvas = await html2canvas(el, { scale: 2, backgroundColor: '#f5f5f3', useCORS: true, logging: false });
+  return cachedCanvas;
+}
+
+async function exportImage(e) {
+  const btn = e.target; btn.textContent = 'Generating…'; btn.disabled = true;
+  try {
+    const canvas = await getCanvas();
+    const link = document.createElement('a');
+    link.download = (state.sessionName||'mabar').replace(/\s+/g,'-').toLowerCase()+'-results.png';
+    link.href = canvas.toDataURL('image/png'); link.click();
+  } catch(err) { alert('Could not generate image: ' + err.message); }
+  btn.textContent = 'Download image'; btn.disabled = false;
+}
+
+async function shareImage(e) {
+  const btn = e.target; btn.textContent = 'Preparing…'; btn.disabled = true;
+  try {
+    const canvas = await getCanvas();
+    canvas.toBlob(async blob => {
+      const file = new File([blob], 'mabar-results.png', { type: 'image/png' });
+      const title = (state.sessionName||'Tennis Mabar') + ' Results';
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title });
+      } else {
+        await navigator.share({ title, text: buildShareText() });
+      }
+      btn.textContent = 'Share'; btn.disabled = false;
+    });
+  } catch(err) { btn.textContent = 'Share'; btn.disabled = false; }
+}
+
+function buildShareText() {
+  const sorted = [...state.players].sort((a,b) => b.score - a.score);
+  return `🎾 ${state.sessionName||'Tennis Mabar'} Results\n` + sorted.map((p,i) => `${i+1}. ${p.name} — ${p.score} pts`).join('\n');
+}
+
+function resetGame() {
+  if (!confirm('Reset everything and start a new game?')) return;
+  state = { players:[], round:0, maxCourts:1, sessionName:'', bgPhoto:null, courts:[], sittingOut:[], history:[], partnerHistory:{}, absentNext:new Set() };
+  save(); location.reload();
+}
+
+load();
+
+if (state.round > 0 && state.players.length >= 4) {
+  setupCourts = state.maxCourts || 1;
+  document.getElementById('view-setup').style.display = 'none';
+  document.getElementById('view-game').style.display = 'block';
+  document.getElementById('tab-bar').style.display = 'flex';
+  document.getElementById('sticky-bar').style.display = 'block';
+  document.getElementById('phase-badge').textContent = 'Round ' + state.round;
+  document.getElementById('phase-badge').className = 'badge badge-round';
+  document.getElementById('game-session-name').textContent = state.sessionName || '';
+  renderCourts(); renderAbsentToggles(); renderLeaderboard(); renderHistory();
+} else {
+  document.getElementById('courts-count-display').textContent = setupCourts;
+  renderSetup();
+}
+</script>
+</body>
+</html>
