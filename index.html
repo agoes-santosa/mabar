@@ -9,7 +9,7 @@
   body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; font-size: 16px; }
   .app { max-width: 600px; margin: 0 auto; padding: 0 1rem 5rem; }
 
-  header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 0 1.25rem; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 0; }
   header h1 { font-size: 1.1rem; font-weight: 700; }
   .badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; }
   .badge-round { background: #d6f0e0; color: #166534; }
@@ -21,7 +21,6 @@
   .player-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid #f0f0ec; min-height: 48px; }
   .player-row:last-child { border-bottom: none; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; background: #e8e4fe; color: #5b4fcf; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; overflow: hidden; }
-  .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
   .avatar.absent { background: #f0f0ec; color: #999; }
   .player-name { flex: 1; font-size: 15px; }
   .player-score { font-size: 15px; font-weight: 700; min-width: 32px; text-align: right; }
@@ -49,10 +48,19 @@
   .court-label { font-size: 12px; font-weight: 700; color: #5b4fcf; text-transform: uppercase; letter-spacing: .07em; }
   .vs-row { display: flex; align-items: center; gap: 6px; margin-top: .625rem; }
   .team { flex: 1; min-width: 0; }
-  .team-names { font-size: 14px; font-weight: 600; }
-  .team-names span { display: block; padding: 3px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .score-box { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .score-sep { font-size: 14px; font-weight: 700; color: #ccc; }
+
+  .player-slot { display: flex; align-items: center; gap: 5px; padding: 3px 0; }
+  .slot-name { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slot-name-muted { color: #888; font-weight: 500; }
+  .swap-select { font-size: 11px; color: #5b4fcf; background: #f0effe; border: none; border-radius: 6px; padding: 3px 5px; cursor: pointer; flex-shrink: 0; min-height: 26px; -webkit-appearance: auto; }
+
+  .preview-card { background: #fafaf8; border-radius: 12px; border: 0.5px dashed #d0d0cc; padding: .875rem 1rem; margin-bottom: .875rem; }
+  .preview-court { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 0.5px solid #f0f0ec; font-size: 13px; }
+  .preview-court:last-child { border-bottom: none; }
+  .preview-team { flex: 1; }
+  .preview-sep { font-size: 11px; font-weight: 700; color: #ccc; padding: 0 6px; }
 
   .leaderboard-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid #f0f0ec; min-height: 52px; }
   .leaderboard-row:last-child { border-bottom: none; }
@@ -62,15 +70,15 @@
   .rank-3 { color: #92400e; }
 
   .add-row { display: flex; gap: 8px; margin-top: .875rem; }
-  .section-note { font-size: 12px; color: #aaa; margin-top: .5rem; }
 
   .tag { font-size: 11px; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
   .tag-absent { background: #f3f4f6; color: #6b7280; }
   .tag-rest { background: #fef3c7; color: #92400e; }
 
   .empty-state { text-align: center; padding: 2rem 0; color: #bbb; font-size: 15px; }
-  .history-item { font-size: 13px; color: #888; padding: 5px 0; border-bottom: 0.5px solid #f5f5f3; }
-  .history-item:last-child { border-bottom: none; }
+  .history-block { margin-bottom: .875rem; padding-bottom: .875rem; border-bottom: 0.5px solid #f0f0ec; }
+  .history-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .history-item { font-size: 13px; color: #888; padding: 4px 0; }
 
   .tabs { display: flex; gap: 4px; background: #ebebea; border-radius: 12px; padding: 3px; margin-bottom: 1rem; }
   .tab { flex: 1; text-align: center; padding: 10px 8px; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 10px; border: none; background: none; color: #888; min-height: 44px; }
@@ -85,7 +93,7 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 
   .court-counter { display: flex; align-items: center; gap: 16px; }
-  .counter-btn { width: 44px; height: 44px; border-radius: 50%; border: 0.5px solid #d0d0cc; background: #fff; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 400; color: #333; }
+  .counter-btn { width: 44px; height: 44px; border-radius: 50%; border: 0.5px solid #d0d0cc; background: #fff; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #333; }
   .counter-val { font-size: 28px; font-weight: 700; min-width: 32px; text-align: center; }
 
   .summary-card { background: #fff; border-radius: 16px; border: 0.5px solid #e5e5e0; padding: 1.5rem 1.25rem; margin-bottom: 1rem; }
@@ -98,7 +106,6 @@
   .podium-name { font-size: 13px; font-weight: 600; text-align: center; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .podium-pts { font-size: 11px; color: #888; }
   .podium-avatar { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; overflow: hidden; flex-shrink: 0; }
-  .podium-avatar img { width: 100%; height: 100%; object-fit: cover; }
   .podium-avatar-1 { background: #fef3c7; color: #d97706; border: 2px solid #fbbf24; }
   .podium-avatar-2 { background: #f1f5f9; color: #475569; border: 2px solid #cbd5e1; }
   .podium-avatar-3 { background: #fdf4e7; color: #92400e; border: 2px solid #d9b99b; }
@@ -113,11 +120,14 @@
   .btn-share { background: #0ea5e9; color: #fff; }
   .session-title-display { font-size: 22px; font-weight: 800; margin-top: 4px; }
   .session-date { font-size: 12px; color: #999; margin-top: 2px; }
-  .sum-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; background: #e8e4fe; color: #5b4fcf; }
-  .sum-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .sum-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; background: #e8e4fe; color: #5b4fcf; }
 
   .bg-photo-btn { display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 12px; border: 1.5px dashed #d0d0cc; background: none; cursor: pointer; width: 100%; font-size: 15px; color: #666; }
   .bg-preview { width: 52px; height: 40px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+  .sort-toggle-row { display: flex; gap: 4px; }
+  .sort-btn { border: none; border-radius: 8px; padding: 7px 13px; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 34px; color: #888; background: #f0f0ec; }
+  .sort-btn.active { background: #5b4fcf; color: #fff; }
+
   .summary-bg-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.38); border-radius: 16px; }
   .summary-card-inner { position: relative; z-index: 1; }
   .summary-card.has-bg { position: relative; overflow: hidden; color: #fff; }
@@ -149,13 +159,12 @@
     <button class="tab" onclick="switchTab('players')" id="tab-players">Players</button>
   </div>
 
-  <!-- SETUP VIEW -->
+  <!-- SETUP -->
   <div id="view-setup">
     <div class="card">
       <div class="card-title">Session name</div>
       <input type="text" id="session-name-input" placeholder="e.g. Saturday Morning" />
     </div>
-
     <div class="card">
       <div class="card-title">Number of courts</div>
       <div class="court-counter">
@@ -165,7 +174,6 @@
         <span style="font-size:14px;color:#888">available</span>
       </div>
     </div>
-
     <div class="card">
       <div class="card-title">Players</div>
       <div id="player-list-setup"></div>
@@ -179,11 +187,10 @@
     <div style="height:.5rem"></div>
   </div>
 
-  <!-- GAME VIEW -->
+  <!-- GAME -->
   <div id="view-game" style="display:none">
     <div id="courts-view">
       <div id="round-banner" style="display:none" class="round-banner"><span class="dot"></span><span id="round-banner-text"></span></div>
-
       <div class="card" style="margin-bottom:.875rem">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div>
@@ -205,16 +212,25 @@
         <div id="sitting-out-list"></div>
       </div>
 
+      <div id="preview-section" style="display:none">
+        <div class="preview-card">
+          <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem">Next round preview</div>
+          <div id="preview-content"></div>
+          <div style="font-size:11px;color:#bbb;margin-top:.5rem">Tentative — updates when you change absences</div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">Skip next round</div>
         <div id="absent-toggles"></div>
-        <div style="margin-top:.75rem;padding-top:.75rem;border-top:0.5px solid #f0f0ec">
-          <button class="btn btn-secondary btn-sm" style="width:100%;font-size:14px" onclick="toggleQuickAdd()">＋ Player joining?</button>
-          <div id="quick-add-row" style="display:none;margin-top:8px;display:none">
-            <div class="add-row" style="margin-top:0">
-              <input type="text" id="quick-add-input" placeholder="New player name" onkeydown="if(event.key==='Enter')quickAddPlayer()" style="font-size:16px" />
-              <button class="btn btn-primary btn-sm" onclick="quickAddPlayer()">Add</button>
-            </div>
+        <div style="margin-top:.75rem;padding-top:.75rem;border-top:0.5px solid #f0f0ec;display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" style="flex:1;font-size:14px" onclick="toggleQuickAdd()">＋ Player joining?</button>
+          <button class="btn btn-secondary btn-sm" style="font-size:13px;color:#5b4fcf" onclick="togglePreview()" id="preview-toggle-btn">👀 Preview next</button>
+        </div>
+        <div id="quick-add-row" style="display:none;margin-top:8px">
+          <div class="add-row" style="margin-top:0">
+            <input type="text" id="quick-add-input" placeholder="New player name" onkeydown="if(event.key==='Enter')quickAddPlayer()" style="font-size:16px" />
+            <button class="btn btn-primary btn-sm" onclick="quickAddPlayer()">Add</button>
           </div>
         </div>
       </div>
@@ -224,7 +240,14 @@
 
     <div id="standings-view" style="display:none">
       <div class="card">
-        <div class="card-title">Standings</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+          <span class="card-title" style="margin-bottom:0">Standings</span>
+          <div class="sort-toggle-row">
+            <button class="sort-btn active" id="sort-pts-btn" onclick="setSortMode('points')">Points</button>
+            <button class="sort-btn" id="sort-wr-btn" onclick="setSortMode('winrate')">Win %</button>
+            <button class="sort-btn" id="sort-pp-btn" onclick="setSortMode('ptspct')">Pts %</button>
+          </div>
+        </div>
         <div id="leaderboard-list"></div>
       </div>
       <div class="card" id="history-card" style="display:none">
@@ -247,11 +270,11 @@
     </div>
   </div>
 
-  <!-- SUMMARY VIEW -->
+  <!-- SUMMARY -->
   <div id="view-summary" style="display:none">
     <div id="summary-capture" style="background:#f5f5f3;padding:4px 0 8px">
       <div class="summary-card" id="summary-card-el">
-        <img id="summary-bg-img" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:16px;filter:blur(3px);transform:scale(1.05)" alt="" />
+        <div id="summary-bg-div" style="display:none;position:absolute;inset:0;border-radius:16px;background-size:cover;background-position:center;background-repeat:no-repeat;filter:blur(3px);transform:scale(1.05)"></div>
         <div id="summary-bg-overlay" class="summary-bg-overlay" style="display:none"></div>
         <div class="summary-card-inner">
           <div style="text-align:center;margin-bottom:1rem">
@@ -271,7 +294,11 @@
         </div>
       </div>
     </div>
-
+    <div style="display:flex;justify-content:flex-end;gap:4px;margin-bottom:.75rem">
+      <button class="sort-btn active" id="sum-sort-pts-btn" onclick="setSortMode('points')">Points</button>
+      <button class="sort-btn" id="sum-sort-wr-btn" onclick="setSortMode('winrate')">Win %</button>
+      <button class="sort-btn" id="sum-sort-pp-btn" onclick="setSortMode('ptspct')">Pts %</button>
+    </div>
     <div class="card" style="margin-bottom:.875rem">
       <div class="card-title">Background photo</div>
       <button class="bg-photo-btn" onclick="document.getElementById('bg-file-input').click()">
@@ -282,17 +309,22 @@
         <button class="btn btn-secondary btn-sm" onclick="removeBgPhoto()">Remove photo</button>
       </div>
     </div>
-
     <div class="export-actions" style="margin-bottom:.5rem">
       <button class="btn btn-export" style="flex:1" onclick="exportImage(event)">Download image</button>
       <button class="btn btn-share" id="btn-share" style="flex:1;display:none" onclick="shareImage(event)">Share</button>
+    </div>
+    <div class="card" style="margin-bottom:.875rem">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span class="card-title" style="margin-bottom:0">Round history</span>
+        <button class="btn btn-secondary btn-sm" style="color:#5b4fcf;font-size:13px" onclick="toggleSummaryHistory()">✏️ Edit scores</button>
+      </div>
+      <div id="sum-history-list" style="display:none;margin-top:.75rem"></div>
     </div>
     <button class="btn btn-secondary btn-full" onclick="resetGame()">New game</button>
     <div style="height:.5rem"></div>
   </div>
 </div>
 
-<!-- Sticky bottom action bar (game view only) -->
 <div class="sticky-actions" id="sticky-bar" style="display:none">
   <div class="sticky-inner">
     <button class="btn btn-primary" style="flex:1" onclick="submitRound()">Save &amp; next round</button>
@@ -305,6 +337,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 let setupCourts = 1;
+let editingHistoryRound = null;
+let summaryEditingRound = null;
+let sortMode = 'points';
 
 let state = {
   players: [],
@@ -316,20 +351,23 @@ let state = {
   sittingOut: [],
   history: [],
   partnerHistory: {},
+  opponentHistory: {},
   absentNext: new Set()
 };
 
 function save() {
-  try { localStorage.setItem('mabar_v1', JSON.stringify(state, (k,v) => v instanceof Set ? [...v] : v)); } catch(e){}
+  try { localStorage.setItem('mabar_v2', JSON.stringify(state, (k,v) => v instanceof Set ? [...v] : v)); } catch(e){}
 }
 function load() {
   try {
-    const d = localStorage.getItem('mabar_v1');
+    const d = localStorage.getItem('mabar_v2');
     if (d) {
-      const parsed = JSON.parse(d);
-      parsed.absentNext = new Set(parsed.absentNext || []);
-      parsed.partnerHistory = parsed.partnerHistory || {};
-      state = parsed;
+      const p = JSON.parse(d);
+      p.absentNext = new Set(p.absentNext || []);
+      p.partnerHistory = p.partnerHistory || {};
+      p.opponentHistory = p.opponentHistory || {};
+      (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; });
+      state = p;
     }
   } catch(e){}
 }
@@ -337,16 +375,16 @@ function load() {
 function initials(name) {
   return name.trim().split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2) || '?';
 }
-
 function avatarHtml(player, size=36, fontSize=13) {
-  const style = `width:${size}px;height:${size}px;font-size:${fontSize}px`;
-  return `<div class="avatar" style="${style}">${initials(player ? player.name : '?')}</div>`;
+  return `<div class="avatar" style="width:${size}px;height:${size}px;font-size:${fontSize}px">${initials(player?player.name:'?')}</div>`;
 }
 
 function changeCourts(delta) {
   setupCourts = Math.max(1, Math.min(6, setupCourts + delta));
   document.getElementById('courts-count-display').textContent = setupCourts;
 }
+
+// ── SETUP ────────────────────────────────────────────────────────────────────
 
 function renderSetup() {
   const list = document.getElementById('player-list-setup');
@@ -363,22 +401,19 @@ function addPlayer() {
   const inp = document.getElementById('new-player-input');
   const name = inp.value.trim();
   if (!name) return;
-  state.players.push({ name, score: 0, rounds: 0, courtsPlayed: 0, lastSatOutRound: 0 });
-  inp.value = '';
-  inp.focus();
-  renderSetup();
-  save();
+  state.players.push({ name, score:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
+  inp.value = ''; inp.focus();
+  renderSetup(); save();
 }
 
 function removePlayerSetup(i) {
   state.players.splice(i, 1);
-  renderSetup();
-  save();
+  renderSetup(); save();
 }
 
 function startGame() {
   const err = document.getElementById('start-error');
-  if (state.players.length < 4) { err.textContent = 'Need at least 4 players to start.'; err.style.display='block'; return; }
+  if (state.players.length < 4) { err.textContent='Need at least 4 players to start.'; err.style.display='block'; return; }
   err.style.display = 'none';
   state.maxCourts = setupCourts;
   state.sessionName = document.getElementById('session-name-input').value.trim();
@@ -392,30 +427,23 @@ function startGame() {
   generateRound();
 }
 
+// ── SHUFFLE ALGORITHM ────────────────────────────────────────────────────────
+
 function activePlayers() {
   return state.players.filter(p => !state.absentNext.has(p.name));
 }
 
 function shuffle(arr) {
   const a = [...arr];
-  for (let i = a.length-1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i+1));
-    [a[i],a[j]] = [a[j],a[i]];
-  }
+  for (let i=a.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
   return a;
 }
 
-function pairKey(a, b) {
-  return [a, b].sort().join('|');
-}
+function pairKey(a, b) { return [a,b].sort().join('|'); }
+function getPartnerCount(a, b) { return state.partnerHistory[pairKey(a,b)] || 0; }
+function getOpponentCount(a, b) { return state.opponentHistory[pairKey(a,b)] || 0; }
 
-function getPairCount(a, b) {
-  return state.partnerHistory[pairKey(a, b)] || 0;
-}
-
-function smartSelectPlayers(active, numSlots) {
-  // Group by courtsPlayed, shuffle within each group, then flatten in order
-  // Those with fewer courts played get priority. Tie-break: sat out most recently first.
+function smartSelectPlayers(active) {
   const groups = {};
   active.forEach(p => {
     const k = p.courtsPlayed || 0;
@@ -423,16 +451,14 @@ function smartSelectPlayers(active, numSlots) {
     groups[k].push(p);
   });
   const result = [];
-  Object.keys(groups).sort((a,b) => a-b).forEach(k => {
-    // Within same courtsPlayed tier, prioritize those who sat out more recently
+  Object.keys(groups).sort((a,b)=>a-b).forEach(k => {
     const tier = groups[k].sort((a,b) => (b.lastSatOutRound||0) - (a.lastSatOutRound||0));
-    // Add a tiny shuffle within ties of the same (courtsPlayed, lastSatOutRound) to avoid rigid patterns
     let i = 0;
     while (i < tier.length) {
       let j = i;
       while (j < tier.length && tier[j].lastSatOutRound === tier[i].lastSatOutRound) j++;
-      const slice = tier.slice(i, j);
-      shuffle(slice).forEach((p, idx) => { tier[i + idx] = p; });
+      const slice = shuffle(tier.slice(i, j));
+      slice.forEach((p,idx) => { tier[i+idx] = p; });
       i = j;
     }
     result.push(...tier);
@@ -440,76 +466,114 @@ function smartSelectPlayers(active, numSlots) {
   return result;
 }
 
-function formBalancedCourts(players, numCourts) {
-  // Greedy partner assignment: minimize repeat partnerships
-  // For each open slot, pick the best available partner for the first unpaired player
+function formPairs(players) {
+  // Greedy: for each player, pick the partner they've played with least
   const remaining = [...players];
   const pairs = [];
-
   while (remaining.length >= 2) {
     const first = remaining.shift();
-    let bestIdx = 0;
-    let bestScore = Infinity;
-    for (let i = 0; i < remaining.length; i++) {
-      const score = getPairCount(first.name, remaining[i].name);
-      if (score < bestScore) { bestScore = score; bestIdx = i; }
+    let bestIdx = 0, bestScore = Infinity;
+    for (let i=0; i<remaining.length; i++) {
+      const s = getPartnerCount(first.name, remaining[i].name);
+      if (s < bestScore) { bestScore=s; bestIdx=i; }
     }
-    const partner = remaining.splice(bestIdx, 1)[0];
-    pairs.push([first, partner]);
+    pairs.push([first, remaining.splice(bestIdx,1)[0]]);
   }
-
-  // Pair up pairs into courts: also try to avoid repeat opponents (secondary concern)
-  const courts = [];
-  for (let i = 0; i + 1 < pairs.length; i += 2) {
-    courts.push({
-      team1: [pairs[i][0].name, pairs[i][1].name],
-      team2: [pairs[i+1][0].name, pairs[i+1][1].name],
-      score1: '', score2: ''
-    });
-  }
-  return courts;
+  return pairs;
 }
 
-function generateRound(advance = true) {
+function courtMatchScore(p1, p2) {
+  // Reward: former partners now facing off (good variety)
+  // Penalise: repeat opponents
+  let score = 0;
+  p1.forEach(a => p2.forEach(b => {
+    score += getPartnerCount(a.name, b.name) * 3;
+    score -= getOpponentCount(a.name, b.name) * 2;
+  }));
+  return score;
+}
+
+function bestCourtAssignment(pairs) {
+  // Recursively try all matchup permutations, return highest-scoring assignment
+  if (pairs.length === 0) return { courts:[], score:0 };
+  let best = null;
+  for (let i=1; i<pairs.length; i++) {
+    const opponent = pairs[i];
+    const rest = pairs.filter((_,idx) => idx!==0 && idx!==i);
+    const sub = bestCourtAssignment(rest);
+    const score = courtMatchScore(pairs[0], opponent) + sub.score;
+    if (!best || score > best.score) {
+      best = {
+        courts: [{team1:pairs[0].map(p=>p.name), team2:opponent.map(p=>p.name), score1:'', score2:''}, ...sub.courts],
+        score
+      };
+    }
+  }
+  return best || { courts:[], score:0 };
+}
+
+function formBalancedCourts(players) {
+  const pairs = formPairs(players);
+  if (pairs.length < 2) return [];
+  return bestCourtAssignment(pairs).courts;
+}
+
+function generateRound(advance=true) {
   if (advance) state.round++;
   document.getElementById('phase-badge').textContent = 'Round ' + state.round;
   document.getElementById('round-num').textContent = state.round;
   document.getElementById('round-banner').style.display = 'none';
 
   const active = activePlayers();
-  const maxByPlayers = Math.floor(active.length / 4);
-  const numCourts = Math.min(maxByPlayers, state.maxCourts);
+  const numCourts = Math.min(Math.floor(active.length/4), state.maxCourts);
   const numPlaying = numCourts * 4;
 
-  const prioritized = smartSelectPlayers(active, numPlaying);
+  const prioritized = smartSelectPlayers(active);
   const toPlay = prioritized.slice(0, numPlaying);
   const sitting = prioritized.slice(numPlaying);
 
-  state.courts = formBalancedCourts(toPlay, numCourts);
+  state.courts = formBalancedCourts(toPlay);
   state.sittingOut = sitting.map(p => p.name);
 
-  // Mark sit-out round so priority works next time
   sitting.forEach(p => {
-    const pl = state.players.find(x => x.name === p.name);
+    const pl = state.players.find(x=>x.name===p.name);
     if (pl) pl.lastSatOutRound = state.round;
   });
 
   renderCourts();
   renderAbsentToggles();
+  if (document.getElementById('preview-section').style.display !== 'none') renderNextRoundPreview();
   save();
+}
+
+// ── COURTS RENDERING ─────────────────────────────────────────────────────────
+
+function playerSlotHtml(courtIdx, team, playerIdx, name, alignRight=false) {
+  const inCourt = [...state.courts[courtIdx].team1, ...state.courts[courtIdx].team2];
+  const available = state.sittingOut.filter(n => !inCourt.includes(n) || n===name);
+  const swapSelect = available.length
+    ? `<select class="swap-select" onchange="swapPlayer(${courtIdx},'${team}',${playerIdx},this.value);this.value=''">
+        <option value="" disabled selected>⇄</option>
+        ${available.map(n=>`<option value="${n}">${n}</option>`).join('')}
+       </select>`
+    : '';
+  const isSecond = playerIdx === 1;
+  return `<div class="player-slot" style="${alignRight?'justify-content:flex-end':''}">
+    ${alignRight ? swapSelect : ''}
+    <span class="slot-name ${isSecond?'slot-name-muted':''}" style="${alignRight?'text-align:right':''}">${name}</span>
+    ${alignRight ? '' : swapSelect}
+  </div>`;
 }
 
 function renderCourts() {
   const list = document.getElementById('courts-list');
-  list.innerHTML = state.courts.map((c, i) => `
+  list.innerHTML = state.courts.map((c,i) => `
     <div class="court-card">
       <span class="court-label">Court ${i+1}</span>
       <div class="vs-row">
         <div class="team">
-          <div class="team-names">
-            <span>${c.team1[0]}</span>
-            <span style="color:#888;font-weight:500">${c.team1[1]}</span>
-          </div>
+          ${playerSlotHtml(i,'team1',0,c.team1[0])}
+          ${playerSlotHtml(i,'team1',1,c.team1[1])}
         </div>
         <div class="score-box">
           <input type="number" min="0" max="99" value="${c.score1}" placeholder="0"
@@ -518,26 +582,19 @@ function renderCourts() {
           <input type="number" min="0" max="99" value="${c.score2}" placeholder="0"
             oninput="state.courts[${i}].score2=this.value;updateTotal()" inputmode="numeric" />
         </div>
-        <div class="team" style="text-align:right">
-          <div class="team-names">
-            <span>${c.team2[0]}</span>
-            <span style="color:#888;font-weight:500">${c.team2[1]}</span>
-          </div>
+        <div class="team">
+          ${playerSlotHtml(i,'team2',0,c.team2[0],true)}
+          ${playerSlotHtml(i,'team2',1,c.team2[1],true)}
         </div>
       </div>
     </div>`).join('');
 
   const soCard = document.getElementById('sitting-out-card');
-  const soList = document.getElementById('sitting-out-list');
   if (state.sittingOut.length) {
     soCard.style.display = 'block';
-    soList.innerHTML = state.sittingOut.map(n => {
+    document.getElementById('sitting-out-list').innerHTML = state.sittingOut.map(n => {
       const p = state.players.find(x=>x.name===n);
-      return `<div class="player-row">
-        ${avatarHtml(p)}
-        <div class="player-name">${n}</div>
-        <span class="tag tag-rest">Resting</span>
-      </div>`;
+      return `<div class="player-row">${avatarHtml(p)}<div class="player-name">${n}</div><span class="tag tag-rest">Resting</span></div>`;
     }).join('');
   } else {
     soCard.style.display = 'none';
@@ -546,9 +603,58 @@ function renderCourts() {
 }
 
 function updateTotal() {
-  const total = state.courts.reduce((sum, c) => sum + (parseInt(c.score1)||0) + (parseInt(c.score2)||0), 0);
+  const total = state.courts.reduce((s,c) => s+(parseInt(c.score1)||0)+(parseInt(c.score2)||0), 0);
   document.getElementById('total-points').textContent = total;
 }
+
+function swapPlayer(courtIdx, team, playerIdx, newName) {
+  if (!newName) return;
+  const oldName = state.courts[courtIdx][team][playerIdx];
+  state.courts[courtIdx][team][playerIdx] = newName;
+  state.sittingOut = state.sittingOut.filter(n => n !== newName);
+  if (!state.sittingOut.includes(oldName)) state.sittingOut.push(oldName);
+  const p = state.players.find(x=>x.name===oldName);
+  if (p) p.lastSatOutRound = state.round;
+  save();
+  renderCourts();
+  if (document.getElementById('preview-section').style.display !== 'none') renderNextRoundPreview();
+}
+
+// ── PREVIEW ───────────────────────────────────────────────────────────────────
+
+function togglePreview() {
+  const sec = document.getElementById('preview-section');
+  const btn = document.getElementById('preview-toggle-btn');
+  const visible = sec.style.display !== 'none';
+  sec.style.display = visible ? 'none' : 'block';
+  btn.style.color = visible ? '#5b4fcf' : '#166534';
+  if (!visible) renderNextRoundPreview();
+}
+
+function computeNextRound() {
+  const active = activePlayers();
+  const numCourts = Math.min(Math.floor(active.length/4), state.maxCourts);
+  const numPlaying = numCourts * 4;
+  const prioritized = smartSelectPlayers(active);
+  const toPlay = prioritized.slice(0, numPlaying);
+  const sitting = prioritized.slice(numPlaying);
+  return { courts: formBalancedCourts(toPlay), sittingOut: sitting.map(p=>p.name) };
+}
+
+function renderNextRoundPreview() {
+  const { courts, sittingOut } = computeNextRound();
+  const el = document.getElementById('preview-content');
+  if (!courts.length) { el.innerHTML = '<div style="font-size:13px;color:#bbb">Not enough active players for a court.</div>'; return; }
+  el.innerHTML = courts.map((c,i) => `
+    <div class="preview-court">
+      <div class="preview-team">${c.team1.join(' & ')}</div>
+      <span class="preview-sep">vs</span>
+      <div class="preview-team" style="text-align:right">${c.team2.join(' & ')}</div>
+    </div>`).join('')
+    + (sittingOut.length ? `<div style="font-size:12px;color:#bbb;margin-top:6px">Resting: ${sittingOut.join(', ')}</div>` : '');
+}
+
+// ── ABSENCES & QUICK ADD ──────────────────────────────────────────────────────
 
 function renderAbsentToggles() {
   const container = document.getElementById('absent-toggles');
@@ -558,6 +664,13 @@ function renderAbsentToggles() {
       <span>${p.name}</span>
       ${state.absentNext.has(p.name)?'<span class="tag tag-absent">Absent</span>':''}
     </label>`).join('');
+}
+
+function toggleAbsent(name, checked) {
+  if (checked) state.absentNext.add(name); else state.absentNext.delete(name);
+  renderAbsentToggles();
+  if (document.getElementById('preview-section').style.display !== 'none') renderNextRoundPreview();
+  save();
 }
 
 function toggleQuickAdd() {
@@ -571,77 +684,124 @@ function quickAddPlayer() {
   const inp = document.getElementById('quick-add-input');
   const name = inp.value.trim();
   if (!name) return;
-  if (state.players.find(p => p.name === name)) { alert('Player already exists'); return; }
-  state.players.push({ name, score: 0, rounds: 0, courtsPlayed: 0, lastSatOutRound: state.round });
+  if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
+  state.players.push({ name, score:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
   inp.value = '';
   document.getElementById('quick-add-row').style.display = 'none';
   renderAbsentToggles();
   renderLeaderboard();
   save();
-  const banner = document.getElementById('round-banner');
   document.getElementById('round-banner-text').textContent = `${name} added — they'll join the next round.`;
-  banner.style.display = 'flex';
+  document.getElementById('round-banner').style.display = 'flex';
 }
 
-function toggleAbsent(name, checked) {
-  if (checked) state.absentNext.add(name); else state.absentNext.delete(name);
-  renderAbsentToggles();
-  save();
+// ── SCORE SUBMISSION ──────────────────────────────────────────────────────────
+
+function recalcAll() {
+  state.players.forEach(p => { p.score=0; p.rounds=0; p.courtsPlayed=0; p.lastSatOutRound=0; p.wins=0; p.maxPossible=0; });
+  state.partnerHistory = {};
+  state.opponentHistory = {};
+  [...state.history].reverse().forEach(h => {
+    h.courts.forEach(c => {
+      const s1=c.score1||0, s2=c.score2||0;
+      const t1won=s1>s2, t2won=s2>s1;
+      const maxScore=Math.max(s1,s2);
+      c.team1.forEach(n => { const p=state.players.find(x=>x.name===n); if(p){p.score+=s1;p.rounds++;p.courtsPlayed++;p.maxPossible+=maxScore;if(t1won)p.wins++;} });
+      c.team2.forEach(n => { const p=state.players.find(x=>x.name===n); if(p){p.score+=s2;p.rounds++;p.courtsPlayed++;p.maxPossible+=maxScore;if(t2won)p.wins++;} });
+      const k1=pairKey(c.team1[0],c.team1[1]), k2=pairKey(c.team2[0],c.team2[1]);
+      state.partnerHistory[k1]=(state.partnerHistory[k1]||0)+1;
+      state.partnerHistory[k2]=(state.partnerHistory[k2]||0)+1;
+      c.team1.forEach(a => c.team2.forEach(b => {
+        const ok=pairKey(a,b);
+        state.opponentHistory[ok]=(state.opponentHistory[ok]||0)+1;
+      }));
+    });
+    (h.sittingOut||[]).forEach(n => {
+      const p=state.players.find(x=>x.name===n);
+      if(p){p.rounds++;p.lastSatOutRound=h.round;}
+    });
+  });
 }
 
 function submitRound() {
   let valid = true;
-  state.courts.forEach(c => { if (c.score1==='' || c.score2==='') valid = false; });
+  state.courts.forEach(c => { if(c.score1===''||c.score2==='') valid=false; });
   if (!valid && state.courts.length) {
     if (!confirm('Some scores are empty. Save anyway?')) return;
   }
-
-  const roundSummary = [];
-  state.courts.forEach(c => {
-    const s1 = parseInt(c.score1) || 0;
-    const s2 = parseInt(c.score2) || 0;
-    c.team1.forEach(n => {
-      const p = state.players.find(x=>x.name===n);
-      if (p) { p.score += s1; p.rounds++; p.courtsPlayed = (p.courtsPlayed||0)+1; }
-    });
-    c.team2.forEach(n => {
-      const p = state.players.find(x=>x.name===n);
-      if (p) { p.score += s2; p.rounds++; p.courtsPlayed = (p.courtsPlayed||0)+1; }
-    });
-    // Track partner pairings
-    const k1 = pairKey(c.team1[0], c.team1[1]);
-    const k2 = pairKey(c.team2[0], c.team2[1]);
-    state.partnerHistory[k1] = (state.partnerHistory[k1]||0) + 1;
-    state.partnerHistory[k2] = (state.partnerHistory[k2]||0) + 1;
-    roundSummary.push(`${c.team1.join(' & ')} ${s1}–${s2} ${c.team2.join(' & ')}`);
+  state.history.unshift({
+    round: state.round,
+    courts: state.courts.map(c => ({
+      team1:[...c.team1], team2:[...c.team2],
+      score1:parseInt(c.score1)||0, score2:parseInt(c.score2)||0
+    })),
+    sittingOut: [...state.sittingOut]
   });
-  state.sittingOut.forEach(n => {
-    const p = state.players.find(x=>x.name===n);
-    if (p) p.rounds++;
-  });
-
-  state.history.unshift({ round: state.round, courts: roundSummary });
+  recalcAll();
   renderLeaderboard();
   renderHistory();
-
   document.getElementById('round-banner-text').textContent = `Round ${state.round} saved! Starting round ${state.round+1}…`;
   document.getElementById('round-banner').style.display = 'flex';
   save();
-  setTimeout(() => { generateRound(); window.scrollTo({ top: 0, behavior: 'smooth' }); }, 800);
+  setTimeout(() => { generateRound(); window.scrollTo({top:0,behavior:'smooth'}); }, 800);
+}
+
+// ── LEADERBOARD & HISTORY ─────────────────────────────────────────────────────
+
+function winRatePct(p) {
+  if (!p.courtsPlayed) return '0%';
+  return Math.round((p.wins||0) / p.courtsPlayed * 100) + '%';
+}
+
+function pointPct(p) {
+  if (!p.maxPossible) return '0%';
+  return Math.round(p.score / p.maxPossible * 100) + '%';
+}
+
+function getSortedPlayers() {
+  if (sortMode === 'winrate') {
+    return [...state.players].sort((a,b) => {
+      const ra = a.courtsPlayed ? (a.wins||0)/a.courtsPlayed : 0;
+      const rb = b.courtsPlayed ? (b.wins||0)/b.courtsPlayed : 0;
+      return rb - ra || b.score - a.score;
+    });
+  }
+  if (sortMode === 'ptspct') {
+    return [...state.players].sort((a,b) => {
+      const ra = a.maxPossible ? a.score/a.maxPossible : 0;
+      const rb = b.maxPossible ? b.score/b.maxPossible : 0;
+      return rb - ra || b.score - a.score;
+    });
+  }
+  return [...state.players].sort((a,b) => b.score - a.score);
+}
+
+function setSortMode(mode) {
+  sortMode = mode;
+  document.getElementById('sort-pts-btn')?.classList.toggle('active', mode==='points');
+  document.getElementById('sort-wr-btn')?.classList.toggle('active', mode==='winrate');
+  document.getElementById('sort-pp-btn')?.classList.toggle('active', mode==='ptspct');
+  document.getElementById('sum-sort-pts-btn')?.classList.toggle('active', mode==='points');
+  document.getElementById('sum-sort-wr-btn')?.classList.toggle('active', mode==='winrate');
+  document.getElementById('sum-sort-pp-btn')?.classList.toggle('active', mode==='ptspct');
+  if (document.getElementById('standings-view').style.display !== 'none') renderLeaderboard();
+  if (document.getElementById('view-summary').style.display !== 'none') renderSummaryBoard();
+  cachedCanvas = null;
 }
 
 function renderLeaderboard() {
-  const sorted = [...state.players].sort((a,b) => b.score - a.score);
+  const sorted = getSortedPlayers();
   const list = document.getElementById('leaderboard-list');
-  if (!sorted.length) { list.innerHTML = '<div class="empty-state">No scores yet</div>'; return; }
-  list.innerHTML = sorted.map((p, i) => {
-    const rankClass = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank';
+  if (!sorted.length) { list.innerHTML='<div class="empty-state">No scores yet</div>'; return; }
+  list.innerHTML = sorted.map((p,i) => {
+    const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank';
+    const metric = sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : p.score;
     return `<div class="leaderboard-row">
-      <span class="rank ${rankClass}">${i+1}</span>
-      ${avatarHtml(p, 32, 12)}
+      <span class="rank ${rc}">${i+1}</span>
+      ${avatarHtml(p,32,12)}
       <span class="player-name">${p.name}</span>
       <span style="font-size:13px;color:#bbb;margin-right:6px">${p.courtsPlayed||0} played</span>
-      <span class="player-score">${p.score}</span>
+      <span class="player-score">${metric}</span>
     </div>`;
   }).join('');
 }
@@ -651,25 +811,142 @@ function renderHistory() {
   const list = document.getElementById('history-list');
   if (!state.history.length) { card.style.display='none'; return; }
   card.style.display = 'block';
-  list.innerHTML = state.history.map(h =>
-    `<div style="margin-bottom:.625rem">
-      <div style="font-size:11px;font-weight:700;color:#5b4fcf;margin-bottom:2px">Round ${h.round}</div>
-      ${h.courts.map(c=>`<div class="history-item">${c}</div>`).join('')}
-    </div>`
-  ).join('');
+  list.innerHTML = state.history.map(h => {
+    const isEditing = editingHistoryRound === h.round;
+    return `<div class="history-block">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:700;color:#5b4fcf">Round ${h.round}</span>
+        ${isEditing
+          ? `<div style="display:flex;gap:6px">
+               <button class="btn btn-primary btn-sm" style="min-height:32px;padding:4px 12px;font-size:13px" onclick="saveHistoryEdit(${h.round})">Save</button>
+               <button class="btn btn-secondary btn-sm" style="min-height:32px;padding:4px 10px;font-size:13px" onclick="cancelHistoryEdit()">Cancel</button>
+             </div>`
+          : `<button class="btn btn-secondary btn-sm" style="min-height:32px;padding:4px 10px;font-size:12px;color:#5b4fcf" onclick="editHistoryRound(${h.round})">Edit scores</button>`
+        }
+      </div>
+      ${h.courts.map((c,ci) => isEditing
+        ? `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;flex-wrap:wrap">
+             <span style="font-size:12px;color:#aaa;min-width:52px">Court ${ci+1}</span>
+             <span style="font-size:13px;flex:1">${c.team1.join(' & ')}</span>
+             <input type="number" id="he_${h.round}_${ci}_1" value="${c.score1||0}" inputmode="numeric"
+               style="width:52px;height:44px;font-size:16px;font-weight:700;text-align:center;border:0.5px solid #d0d0cc;border-radius:8px;padding:0;background:#fafaf8;outline:none;-webkit-appearance:none;appearance:none" />
+             <span style="color:#ccc;font-weight:700">—</span>
+             <input type="number" id="he_${h.round}_${ci}_2" value="${c.score2||0}" inputmode="numeric"
+               style="width:52px;height:44px;font-size:16px;font-weight:700;text-align:center;border:0.5px solid #d0d0cc;border-radius:8px;padding:0;background:#fafaf8;outline:none;-webkit-appearance:none;appearance:none" />
+             <span style="font-size:13px;flex:1;text-align:right">${c.team2.join(' & ')}</span>
+           </div>`
+        : `<div class="history-item">Court ${ci+1}: ${c.team1.join(' & ')} ${c.score1||0}–${c.score2||0} ${c.team2.join(' & ')}</div>`
+      ).join('')}
+      ${h.sittingOut&&h.sittingOut.length?`<div style="font-size:11px;color:#bbb;margin-top:3px">Resting: ${h.sittingOut.join(', ')}</div>`:''}
+    </div>`;
+  }).join('');
 }
+
+function editHistoryRound(round) {
+  editingHistoryRound = round;
+  renderHistory();
+  // Scroll to the edit inputs
+  setTimeout(() => document.getElementById(`he_${round}_0_1`)?.scrollIntoView({behavior:'smooth',block:'center'}), 50);
+}
+
+function saveHistoryEdit(round) {
+  const h = state.history.find(x=>x.round===round);
+  if (!h) return;
+  h.courts.forEach((c,ci) => {
+    c.score1 = parseInt(document.getElementById(`he_${round}_${ci}_1`)?.value) || 0;
+    c.score2 = parseInt(document.getElementById(`he_${round}_${ci}_2`)?.value) || 0;
+  });
+  editingHistoryRound = null;
+  recalcAll();
+  save();
+  renderLeaderboard();
+  renderHistory();
+}
+
+function cancelHistoryEdit() {
+  editingHistoryRound = null;
+  renderHistory();
+}
+
+// ── SUMMARY HISTORY EDIT ──────────────────────────────────────────────────────
+
+function toggleSummaryHistory() {
+  const list = document.getElementById('sum-history-list');
+  const visible = list.style.display !== 'none';
+  list.style.display = visible ? 'none' : 'block';
+  if (!visible) renderSummaryHistory();
+}
+
+function renderSummaryHistory() {
+  const list = document.getElementById('sum-history-list');
+  if (!state.history.length) { list.innerHTML='<div class="empty-state" style="padding:1rem 0">No rounds yet</div>'; return; }
+  list.innerHTML = state.history.map(h => {
+    const isEditing = summaryEditingRound === h.round;
+    return `<div class="history-block">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:700;color:#5b4fcf">Round ${h.round}</span>
+        ${isEditing
+          ? `<div style="display:flex;gap:6px">
+               <button class="btn btn-primary btn-sm" style="min-height:32px;padding:4px 12px;font-size:13px" onclick="saveSummaryHistoryEdit(${h.round})">Save</button>
+               <button class="btn btn-secondary btn-sm" style="min-height:32px;padding:4px 10px;font-size:13px" onclick="cancelSummaryHistoryEdit()">Cancel</button>
+             </div>`
+          : `<button class="btn btn-secondary btn-sm" style="min-height:32px;padding:4px 10px;font-size:12px;color:#5b4fcf" onclick="startSummaryHistoryEdit(${h.round})">Edit</button>`
+        }
+      </div>
+      ${h.courts.map((c,ci) => isEditing
+        ? `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;flex-wrap:wrap">
+             <span style="font-size:12px;color:#aaa;min-width:52px">Court ${ci+1}</span>
+             <span style="font-size:13px;flex:1">${c.team1.join(' & ')}</span>
+             <input type="number" id="sme_${h.round}_${ci}_1" value="${c.score1||0}" inputmode="numeric"
+               style="width:52px;height:44px;font-size:16px;font-weight:700;text-align:center;border:0.5px solid #d0d0cc;border-radius:8px;padding:0;background:#fafaf8;outline:none;-webkit-appearance:none;appearance:none" />
+             <span style="color:#ccc;font-weight:700">—</span>
+             <input type="number" id="sme_${h.round}_${ci}_2" value="${c.score2||0}" inputmode="numeric"
+               style="width:52px;height:44px;font-size:16px;font-weight:700;text-align:center;border:0.5px solid #d0d0cc;border-radius:8px;padding:0;background:#fafaf8;outline:none;-webkit-appearance:none;appearance:none" />
+             <span style="font-size:13px;flex:1;text-align:right">${c.team2.join(' & ')}</span>
+           </div>`
+        : `<div class="history-item">Court ${ci+1}: ${c.team1.join(' & ')} ${c.score1||0}–${c.score2||0} ${c.team2.join(' & ')}</div>`
+      ).join('')}
+      ${h.sittingOut&&h.sittingOut.length?`<div style="font-size:11px;color:#bbb;margin-top:3px">Resting: ${h.sittingOut.join(', ')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function startSummaryHistoryEdit(round) {
+  summaryEditingRound = round;
+  renderSummaryHistory();
+  setTimeout(() => document.getElementById(`sme_${round}_0_1`)?.scrollIntoView({behavior:'smooth',block:'center'}), 50);
+}
+
+function saveSummaryHistoryEdit(round) {
+  const h = state.history.find(x=>x.round===round);
+  if (!h) return;
+  h.courts.forEach((c,ci) => {
+    c.score1 = parseInt(document.getElementById(`sme_${round}_${ci}_1`)?.value) || 0;
+    c.score2 = parseInt(document.getElementById(`sme_${round}_${ci}_2`)?.value) || 0;
+  });
+  summaryEditingRound = null;
+  recalcAll();
+  cachedCanvas = null;
+  save();
+  renderSummary();
+  renderSummaryHistory();
+}
+
+function cancelSummaryHistoryEdit() {
+  summaryEditingRound = null;
+  renderSummaryHistory();
+}
+
+// ── PLAYER MANAGEMENT ─────────────────────────────────────────────────────────
 
 function addPlayerMidGame() {
   const inp = document.getElementById('new-player-game-input');
   const name = inp.value.trim();
   if (!name) return;
   if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
-  state.players.push({ name, score: 0, rounds: 0, courtsPlayed: 0, lastSatOutRound: 0 });
+  state.players.push({ name, score:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
   inp.value = '';
-  renderPlayerListGame();
-  renderAbsentToggles();
-  renderLeaderboard();
-  save();
+  renderPlayerListGame(); renderAbsentToggles(); renderLeaderboard(); save();
 }
 
 function removePlayerGame(name) {
@@ -677,15 +954,11 @@ function removePlayerGame(name) {
   state.players = state.players.filter(p=>p.name!==name);
   state.absentNext.delete(name);
   state.courts.forEach(c=>{
-    c.team1 = c.team1.filter(n=>n!==name);
-    c.team2 = c.team2.filter(n=>n!==name);
+    c.team1=c.team1.filter(n=>n!==name);
+    c.team2=c.team2.filter(n=>n!==name);
   });
   state.sittingOut = state.sittingOut.filter(n=>n!==name);
-  renderPlayerListGame();
-  renderCourts();
-  renderAbsentToggles();
-  renderLeaderboard();
-  save();
+  renderPlayerListGame(); renderCourts(); renderAbsentToggles(); renderLeaderboard(); save();
 }
 
 function renderPlayerListGame() {
@@ -698,6 +971,8 @@ function renderPlayerListGame() {
       <button class="btn-icon" onclick="removePlayerGame('${p.name}')">✕</button>
     </div>`).join('');
 }
+
+// ── TABS & NAVIGATION ─────────────────────────────────────────────────────────
 
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -721,136 +996,136 @@ function finishSession() {
   renderSummary();
 }
 
-function renderSummary() {
-  const sorted = [...state.players].sort((a,b) => b.score - a.score);
-  const totalPts = sorted.reduce((s,p) => s+p.score, 0);
-  const now = new Date();
-  document.getElementById('summary-session-name').textContent = state.sessionName || 'Session complete';
-  document.getElementById('summary-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-  document.getElementById('sum-rounds').textContent = state.history.length;
-  document.getElementById('sum-players').textContent = sorted.length;
-  document.getElementById('sum-points').textContent = totalPts;
+function resetGame() {
+  if (!confirm('Reset everything and start a new game?')) return;
+  state = { players:[], round:0, maxCourts:1, sessionName:'', bgPhoto:null, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, absentNext:new Set() };
+  save(); location.reload();
+}
 
-  const podiumOrder = [sorted[1], sorted[0], sorted[2]].filter(Boolean);
-  const avatarClass = ['podium-avatar-2','podium-avatar-1','podium-avatar-3'];
-  const blockClass = ['podium-block-2','podium-block-1','podium-block-3'];
-  const medals = ['🥈','🥇','🥉'];
-  document.getElementById('summary-podium').innerHTML = podiumOrder.map((p, i) =>
+// ── SUMMARY ───────────────────────────────────────────────────────────────────
+
+function renderSummaryBoard() {
+  const sorted = getSortedPlayers();
+  const avCls=['podium-avatar-2','podium-avatar-1','podium-avatar-3'];
+  const blCls=['podium-block-2','podium-block-1','podium-block-3'];
+  const podiumMedals=['🥈','🥇','🥉'];
+  const podiumOrder = [sorted[1],sorted[0],sorted[2]].filter(Boolean);
+  document.getElementById('summary-podium').innerHTML = podiumOrder.map((p,i) =>
     `<div class="podium-slot">
-      <div class="podium-avatar ${avatarClass[i]}">${initials(p.name)}</div>
+      <div class="podium-avatar ${avCls[i]}">${initials(p.name)}</div>
       <div class="podium-name">${p.name}</div>
-      <div class="podium-pts">${p.score} pts</div>
-      <div class="podium-block ${blockClass[i]}">${medals[i]}</div>
-    </div>`
-  ).join('');
+      <div class="podium-pts">${sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : p.score+' pts'}</div>
+      <div class="podium-block ${blCls[i]}">${podiumMedals[i]}</div>
+    </div>`).join('');
 
-  const medals2 = ['🥇','🥈','🥉'];
+  const m2=['🥇','🥈','🥉'];
   document.getElementById('summary-full-board').innerHTML = sorted.map((p,i) =>
     `<div class="summary-row">
-      <span class="medal">${medals2[i]||''}</span>
+      <span class="medal">${m2[i]||''}</span>
       <div class="sum-avatar">${initials(p.name)}</div>
       <span style="flex:1;font-size:14px">${p.name}</span>
       <span style="font-size:12px;color:#aaa;margin-right:8px">${p.courtsPlayed||0} played</span>
-      <span style="font-size:15px;font-weight:700">${p.score}</span>
-    </div>`
-  ).join('');
+      <span style="font-size:15px;font-weight:700">${sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : p.score}</span>
+    </div>`).join('');
+}
 
+function renderSummary() {
+  const byPts = [...state.players].sort((a,b) => b.score-a.score);
+  const totalPts = byPts.reduce((s,p)=>s+p.score, 0);
+  const now = new Date();
+  document.getElementById('summary-session-name').textContent = state.sessionName || 'Session complete';
+  document.getElementById('summary-date').textContent = now.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('sum-rounds').textContent = state.history.length;
+  document.getElementById('sum-players').textContent = byPts.length;
+  document.getElementById('sum-points').textContent = totalPts;
+  renderSummaryBoard();
   applyBgPhoto();
-  if (navigator.share || navigator.canShare) document.getElementById('btn-share').style.display = 'flex';
+  if (navigator.share||navigator.canShare) document.getElementById('btn-share').style.display='flex';
 }
 
 function applyBgPhoto() {
-  const card = document.getElementById('summary-card-el');
-  const bgImg = document.getElementById('summary-bg-img');
-  const overlay = document.getElementById('summary-bg-overlay');
-  const thumb = document.getElementById('bg-preview-thumb');
-  const label = document.getElementById('bg-photo-label');
-  const removeRow = document.getElementById('bg-remove-row');
+  const card=document.getElementById('summary-card-el');
+  const bgDiv=document.getElementById('summary-bg-div');
+  const overlay=document.getElementById('summary-bg-overlay');
+  const thumb=document.getElementById('bg-preview-thumb');
+  const label=document.getElementById('bg-photo-label');
+  const removeRow=document.getElementById('bg-remove-row');
   if (state.bgPhoto) {
-    bgImg.src = state.bgPhoto; bgImg.style.display = 'block';
-    overlay.style.display = 'block'; card.classList.add('has-bg');
-    thumb.src = state.bgPhoto; thumb.style.display = 'block';
-    label.textContent = 'Change background photo';
-    removeRow.style.display = 'block';
+    bgDiv.style.backgroundImage=`url(${state.bgPhoto})`; bgDiv.style.display='block';
+    overlay.style.display='block'; card.classList.add('has-bg');
+    thumb.src=state.bgPhoto; thumb.style.display='block';
+    label.textContent='Change background photo'; removeRow.style.display='block';
   } else {
-    bgImg.src = ''; bgImg.style.display = 'none';
-    overlay.style.display = 'none'; card.classList.remove('has-bg');
-    thumb.style.display = 'none';
-    label.textContent = '📷  Add a background photo';
-    removeRow.style.display = 'none';
+    bgDiv.style.backgroundImage=''; bgDiv.style.display='none';
+    overlay.style.display='none'; card.classList.remove('has-bg');
+    thumb.style.display='none';
+    label.textContent='📷  Add a background photo'; removeRow.style.display='none';
   }
 }
 
 document.getElementById('bg-file-input').addEventListener('change', function() {
-  const file = this.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const maxW = 1200, scale = Math.min(1, maxW / img.width);
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      state.bgPhoto = canvas.toDataURL('image/jpeg', 0.85);
-      cachedCanvas = null; save(); applyBgPhoto();
+  const file=this.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const maxW=1200,scale=Math.min(1,maxW/img.width);
+      canvas.width=Math.round(img.width*scale); canvas.height=Math.round(img.height*scale);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      state.bgPhoto=canvas.toDataURL('image/jpeg',0.85);
+      cachedCanvas=null; save(); applyBgPhoto();
     };
-    img.src = e.target.result;
+    img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 });
 
-function removeBgPhoto() {
-  state.bgPhoto = null; cachedCanvas = null; save(); applyBgPhoto();
-}
+function removeBgPhoto() { state.bgPhoto=null; cachedCanvas=null; save(); applyBgPhoto(); }
+
+// ── EXPORT / SHARE ────────────────────────────────────────────────────────────
 
 let cachedCanvas = null;
 async function getCanvas() {
   if (cachedCanvas) return cachedCanvas;
-  const el = document.getElementById('summary-capture');
-  cachedCanvas = await html2canvas(el, { scale: 2, backgroundColor: '#f5f5f3', useCORS: true, logging: false });
+  cachedCanvas = await html2canvas(document.getElementById('summary-capture'), { scale:2, backgroundColor:'#f5f5f3', useCORS:true, logging:false });
   return cachedCanvas;
 }
 
 async function exportImage(e) {
-  const btn = e.target; btn.textContent = 'Generating…'; btn.disabled = true;
+  const btn=e.target; btn.textContent='Generating…'; btn.disabled=true;
   try {
-    const canvas = await getCanvas();
-    const link = document.createElement('a');
-    link.download = (state.sessionName||'mabar').replace(/\s+/g,'-').toLowerCase()+'-results.png';
-    link.href = canvas.toDataURL('image/png'); link.click();
-  } catch(err) { alert('Could not generate image: ' + err.message); }
-  btn.textContent = 'Download image'; btn.disabled = false;
+    const canvas=await getCanvas();
+    const link=document.createElement('a');
+    link.download=(state.sessionName||'mabar').replace(/\s+/g,'-').toLowerCase()+'-results.png';
+    link.href=canvas.toDataURL('image/png'); link.click();
+  } catch(err){ alert('Could not generate image: '+err.message); }
+  btn.textContent='Download image'; btn.disabled=false;
 }
 
 async function shareImage(e) {
-  const btn = e.target; btn.textContent = 'Preparing…'; btn.disabled = true;
+  const btn=e.target; btn.textContent='Preparing…'; btn.disabled=true;
   try {
-    const canvas = await getCanvas();
-    canvas.toBlob(async blob => {
-      const file = new File([blob], 'mabar-results.png', { type: 'image/png' });
-      const title = (state.sessionName||'Tennis Mabar') + ' Results';
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title });
+    const canvas=await getCanvas();
+    canvas.toBlob(async blob=>{
+      const file=new File([blob],'mabar-results.png',{type:'image/png'});
+      const title=(state.sessionName||'Tennis Mabar')+' Results';
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        await navigator.share({files:[file],title});
       } else {
-        await navigator.share({ title, text: buildShareText() });
+        await navigator.share({title,text:buildShareText()});
       }
-      btn.textContent = 'Share'; btn.disabled = false;
+      btn.textContent='Share'; btn.disabled=false;
     });
-  } catch(err) { btn.textContent = 'Share'; btn.disabled = false; }
+  } catch(err){ btn.textContent='Share'; btn.disabled=false; }
 }
 
 function buildShareText() {
-  const sorted = [...state.players].sort((a,b) => b.score - a.score);
-  return `🎾 ${state.sessionName||'Tennis Mabar'} Results\n` + sorted.map((p,i) => `${i+1}. ${p.name} — ${p.score} pts`).join('\n');
+  const sorted=[...state.players].sort((a,b)=>b.score-a.score);
+  return `🎾 ${state.sessionName||'Tennis Mabar'} Results\n`+sorted.map((p,i)=>`${i+1}. ${p.name} — ${p.score} pts`).join('\n');
 }
 
-function resetGame() {
-  if (!confirm('Reset everything and start a new game?')) return;
-  state = { players:[], round:0, maxCourts:1, sessionName:'', bgPhoto:null, courts:[], sittingOut:[], history:[], partnerHistory:{}, absentNext:new Set() };
-  save(); location.reload();
-}
+// ── INIT ──────────────────────────────────────────────────────────────────────
 
 load();
 
