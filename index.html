@@ -51,8 +51,8 @@
   .score-box { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .score-sep { font-size: 14px; font-weight: 700; color: #ccc; }
 
-  .player-slot { display: flex; align-items: center; gap: 5px; padding: 3px 0; }
-  .slot-name { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .player-slot { display: flex; flex-direction: column; gap: 2px; padding: 4px 0; align-items: flex-start; }
+  .slot-name { font-size: 14px; font-weight: 600; line-height: 1.3; word-break: break-word; }
   .slot-name-muted { color: #888; font-weight: 500; }
   .swap-select { font-size: 11px; color: #5b4fcf; background: #f0effe; border: none; border-radius: 6px; padding: 3px 5px; cursor: pointer; flex-shrink: 0; min-height: 26px; -webkit-appearance: auto; }
 
@@ -128,7 +128,7 @@
   .sort-btn { border: none; border-radius: 8px; padding: 7px 13px; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 34px; color: #888; background: #f0f0ec; }
   .sort-btn.active { background: #5b4fcf; color: #fff; }
 
-  .summary-bg-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.38); border-radius: 16px; }
+  .summary-bg-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.25) 35%, rgba(0,0,0,0.85) 62%, rgba(0,0,0,1) 80%); border-radius: 16px; }
   .summary-card-inner { position: relative; z-index: 1; }
   .summary-card.has-bg { position: relative; overflow: hidden; color: #fff; }
   .summary-card.has-bg .session-title-display,
@@ -274,7 +274,7 @@
   <div id="view-summary" style="display:none">
     <div id="summary-capture" style="background:#f5f5f3;padding:4px 0 8px">
       <div class="summary-card" id="summary-card-el">
-        <div id="summary-bg-div" style="display:none;position:absolute;inset:0;border-radius:16px;background-size:cover;background-position:center;background-repeat:no-repeat;filter:blur(3px);transform:scale(1.05)"></div>
+        <div id="summary-bg-div" style="display:none;position:absolute;inset:0;border-radius:16px;background-size:cover;background-position:center center;background-repeat:no-repeat;filter:blur(2px);transform:scale(1.3)"></div>
         <div id="summary-bg-overlay" class="summary-bg-overlay" style="display:none"></div>
         <div class="summary-card-inner">
           <div style="text-align:center;margin-bottom:1rem">
@@ -308,6 +308,14 @@
       <div id="bg-remove-row" style="display:none;margin-top:10px">
         <button class="btn btn-secondary btn-sm" onclick="removeBgPhoto()">Remove photo</button>
       </div>
+      <div id="bg-position-row" style="display:none;margin-top:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:12px;color:#888;flex-shrink:0">Reposition ↕</span>
+          <input type="range" min="0" max="100" value="35" id="bg-position-slider"
+            oninput="setBgPhotoY(this.value)"
+            style="flex:1;accent-color:#5b4fcf;cursor:pointer" />
+        </div>
+      </div>
     </div>
     <div class="export-actions" style="margin-bottom:.5rem">
       <button class="btn btn-export" style="flex:1" onclick="exportImage(event)">Download image</button>
@@ -340,6 +348,7 @@ let setupCourts = 1;
 let editingHistoryRound = null;
 let summaryEditingRound = null;
 let sortMode = 'points';
+let nextRoundCache = null;
 
 let state = {
   players: [],
@@ -347,6 +356,7 @@ let state = {
   maxCourts: 1,
   sessionName: '',
   bgPhoto: null,
+  bgPhotoY: 35,
   courts: [],
   sittingOut: [],
   history: [],
@@ -367,6 +377,7 @@ function load() {
       p.partnerHistory = p.partnerHistory || {};
       p.opponentHistory = p.opponentHistory || {};
       (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; });
+      if (p.bgPhotoY == null) p.bgPhotoY = 35;
       state = p;
     }
   } catch(e){}
@@ -444,26 +455,21 @@ function getPartnerCount(a, b) { return state.partnerHistory[pairKey(a,b)] || 0;
 function getOpponentCount(a, b) { return state.opponentHistory[pairKey(a,b)] || 0; }
 
 function smartSelectPlayers(active) {
-  const groups = {};
-  active.forEach(p => {
-    const k = p.courtsPlayed || 0;
-    if (!groups[k]) groups[k] = [];
-    groups[k].push(p);
-  });
-  const result = [];
-  Object.keys(groups).sort((a,b)=>a-b).forEach(k => {
-    const tier = groups[k].sort((a,b) => (b.lastSatOutRound||0) - (a.lastSatOutRound||0));
-    let i = 0;
-    while (i < tier.length) {
-      let j = i;
-      while (j < tier.length && tier[j].lastSatOutRound === tier[i].lastSatOutRound) j++;
-      const slice = shuffle(tier.slice(i, j));
-      slice.forEach((p,idx) => { tier[i+idx] = p; });
-      i = j;
-    }
-    result.push(...tier);
-  });
-  return result;
+  if (!state.history.length) return shuffle(active);
+  const lastRound = state.history[0];
+  const justPlayed = new Set(lastRound.courts.flatMap(c => [...c.team1, ...c.team2]));
+  const rested = shuffle(active.filter(p => !justPlayed.has(p.name)));
+  const played = shuffle(active.filter(p =>  justPlayed.has(p.name)));
+  const numCourts = Math.min(Math.floor(active.length / 4), state.maxCourts);
+  const numSlots  = numCourts * 4;
+  // Exact match means the same two groups would alternate forever.
+  // Only swap once everyone has played at least once (so new/unplayed players
+  // always get priority first before the mixing logic kicks in).
+  const everyoneHasPlayed = active.every(p => p.courtsPlayed > 0);
+  if (rested.length === numSlots && played.length > 0 && everyoneHasPlayed) {
+    played.push(rested.pop());
+  }
+  return [...rested, ...played];
 }
 
 function formPairs(players) {
@@ -524,19 +530,23 @@ function generateRound(advance=true) {
   document.getElementById('round-num').textContent = state.round;
   document.getElementById('round-banner').style.display = 'none';
 
-  const active = activePlayers();
-  const numCourts = Math.min(Math.floor(active.length/4), state.maxCourts);
-  const numPlaying = numCourts * 4;
+  if (advance && nextRoundCache) {
+    // Reuse the cached preview — what you saw is exactly what you get
+    state.courts     = nextRoundCache.courts;
+    state.sittingOut = nextRoundCache.sittingOut;
+  } else {
+    const active = activePlayers();
+    const numCourts = Math.min(Math.floor(active.length/4), state.maxCourts);
+    const numPlaying = numCourts * 4;
+    const prioritized = smartSelectPlayers(active);
+    const toPlay = prioritized.slice(0, numPlaying);
+    state.courts     = formBalancedCourts(toPlay);
+    state.sittingOut = prioritized.slice(numPlaying).map(p => p.name);
+  }
+  nextRoundCache = null;
 
-  const prioritized = smartSelectPlayers(active);
-  const toPlay = prioritized.slice(0, numPlaying);
-  const sitting = prioritized.slice(numPlaying);
-
-  state.courts = formBalancedCourts(toPlay);
-  state.sittingOut = sitting.map(p => p.name);
-
-  sitting.forEach(p => {
-    const pl = state.players.find(x=>x.name===p.name);
+  state.sittingOut.forEach(name => {
+    const pl = state.players.find(x=>x.name===name);
     if (pl) pl.lastSatOutRound = state.round;
   });
 
@@ -553,15 +563,14 @@ function playerSlotHtml(courtIdx, team, playerIdx, name, alignRight=false) {
   const available = state.sittingOut.filter(n => !inCourt.includes(n) || n===name);
   const swapSelect = available.length
     ? `<select class="swap-select" onchange="swapPlayer(${courtIdx},'${team}',${playerIdx},this.value);this.value=''">
-        <option value="" disabled selected>⇄</option>
+        <option value="" disabled selected>⇄ swap</option>
         ${available.map(n=>`<option value="${n}">${n}</option>`).join('')}
        </select>`
     : '';
   const isSecond = playerIdx === 1;
-  return `<div class="player-slot" style="${alignRight?'justify-content:flex-end':''}">
-    ${alignRight ? swapSelect : ''}
+  return `<div class="player-slot" style="${alignRight?'align-items:flex-end':''}">
     <span class="slot-name ${isSecond?'slot-name-muted':''}" style="${alignRight?'text-align:right':''}">${name}</span>
-    ${alignRight ? '' : swapSelect}
+    ${swapSelect}
   </div>`;
 }
 
@@ -615,6 +624,7 @@ function swapPlayer(courtIdx, team, playerIdx, newName) {
   if (!state.sittingOut.includes(oldName)) state.sittingOut.push(oldName);
   const p = state.players.find(x=>x.name===oldName);
   if (p) p.lastSatOutRound = state.round;
+  nextRoundCache = null;
   save();
   renderCourts();
   if (document.getElementById('preview-section').style.display !== 'none') renderNextRoundPreview();
@@ -635,10 +645,28 @@ function computeNextRound() {
   const active = activePlayers();
   const numCourts = Math.min(Math.floor(active.length/4), state.maxCourts);
   const numPlaying = numCourts * 4;
-  const prioritized = smartSelectPlayers(active);
+
+  // Use current (unsaved) courts as "just played" reference — this matches what
+  // generateRound() will see in history[0] after submitRound() saves them.
+  const srcCourts = state.courts.length ? state.courts
+    : (state.history.length ? state.history[0].courts : []);
+  const justPlayed = new Set(srcCourts.flatMap(c => [...(c.team1||[]), ...(c.team2||[])]));
+
+  const rested = shuffle(active.filter(p => !justPlayed.has(p.name)));
+  const played  = shuffle(active.filter(p =>  justPlayed.has(p.name)));
+  const numSlots = numPlaying;
+
+  // Include current-round players in the everyoneHasPlayed check
+  const everyoneHasPlayed = active.every(p => p.courtsPlayed > 0 || justPlayed.has(p.name));
+  if (rested.length === numSlots && played.length > 0 && everyoneHasPlayed) {
+    played.push(rested.pop());
+  }
+
+  const prioritized = [...rested, ...played];
   const toPlay = prioritized.slice(0, numPlaying);
   const sitting = prioritized.slice(numPlaying);
-  return { courts: formBalancedCourts(toPlay), sittingOut: sitting.map(p=>p.name) };
+  nextRoundCache = { courts: formBalancedCourts(toPlay), sittingOut: sitting.map(p => p.name) };
+  return nextRoundCache;
 }
 
 function renderNextRoundPreview() {
@@ -668,6 +696,7 @@ function renderAbsentToggles() {
 
 function toggleAbsent(name, checked) {
   if (checked) state.absentNext.add(name); else state.absentNext.delete(name);
+  nextRoundCache = null;
   renderAbsentToggles();
   if (document.getElementById('preview-section').style.display !== 'none') renderNextRoundPreview();
   save();
@@ -688,6 +717,7 @@ function quickAddPlayer() {
   state.players.push({ name, score:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
   inp.value = '';
   document.getElementById('quick-add-row').style.display = 'none';
+  nextRoundCache = null;
   renderAbsentToggles();
   renderLeaderboard();
   save();
@@ -998,7 +1028,7 @@ function finishSession() {
 
 function resetGame() {
   if (!confirm('Reset everything and start a new game?')) return;
-  state = { players:[], round:0, maxCourts:1, sessionName:'', bgPhoto:null, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, absentNext:new Set() };
+  state = { players:[], round:0, maxCourts:1, sessionName:'', bgPhoto:null, bgPhotoY:35, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, absentNext:new Set() };
   save(); location.reload();
 }
 
@@ -1015,13 +1045,14 @@ function renderSummaryBoard() {
       <div class="podium-avatar ${avCls[i]}">${initials(p.name)}</div>
       <div class="podium-name">${p.name}</div>
       <div class="podium-pts">${sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : p.score+' pts'}</div>
+      <div class="podium-pts">${p.courtsPlayed||0} played</div>
       <div class="podium-block ${blCls[i]}">${podiumMedals[i]}</div>
     </div>`).join('');
 
-  const m2=['🥇','🥈','🥉'];
-  document.getElementById('summary-full-board').innerHTML = sorted.map((p,i) =>
+  // Top 3 already shown in the podium — start the list from rank #4
+  document.getElementById('summary-full-board').innerHTML = sorted.slice(3).map((p,i) =>
     `<div class="summary-row">
-      <span class="medal">${m2[i]||''}</span>
+      <span class="medal" style="font-size:12px;font-weight:700;color:#bbb">${i+4}</span>
       <div class="sum-avatar">${initials(p.name)}</div>
       <span style="flex:1;font-size:14px">${p.name}</span>
       <span style="font-size:12px;color:#aaa;margin-right:8px">${p.courtsPlayed||0} played</span>
@@ -1050,16 +1081,21 @@ function applyBgPhoto() {
   const thumb=document.getElementById('bg-preview-thumb');
   const label=document.getElementById('bg-photo-label');
   const removeRow=document.getElementById('bg-remove-row');
+  const posRow=document.getElementById('bg-position-row');
+  const slider=document.getElementById('bg-position-slider');
   if (state.bgPhoto) {
-    bgDiv.style.backgroundImage=`url(${state.bgPhoto})`; bgDiv.style.display='block';
+    const y = state.bgPhotoY ?? 35;
+    bgDiv.style.backgroundImage=`url(${state.bgPhoto})`; bgDiv.style.transform=`scale(1.3) translateY(${(50-y)*0.3}%)`; bgDiv.style.display='block';
     overlay.style.display='block'; card.classList.add('has-bg');
     thumb.src=state.bgPhoto; thumb.style.display='block';
     label.textContent='Change background photo'; removeRow.style.display='block';
+    posRow.style.display='block'; if (slider) slider.value=y;
   } else {
     bgDiv.style.backgroundImage=''; bgDiv.style.display='none';
     overlay.style.display='none'; card.classList.remove('has-bg');
     thumb.style.display='none';
     label.textContent='📷  Add a background photo'; removeRow.style.display='none';
+    posRow.style.display='none';
   }
 }
 
@@ -1082,6 +1118,14 @@ document.getElementById('bg-file-input').addEventListener('change', function() {
 });
 
 function removeBgPhoto() { state.bgPhoto=null; cachedCanvas=null; save(); applyBgPhoto(); }
+
+function setBgPhotoY(val) {
+  state.bgPhotoY = parseInt(val);
+  const bgDiv = document.getElementById('summary-bg-div');
+  if (bgDiv) bgDiv.style.transform = `scale(1.3) translateY(${(50-state.bgPhotoY)*0.3}%)`;
+  cachedCanvas = null;
+  save();
+}
 
 // ── EXPORT / SHARE ────────────────────────────────────────────────────────────
 
