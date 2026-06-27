@@ -14,6 +14,7 @@
   .badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; }
   .badge-round { background: #d6f0e0; color: #166534; }
   .badge-setup { background: #fef3c7; color: #92400e; }
+  .badge-live { background: #fee2e2; color: #991b1b; }
 
   .card { background: #fff; border-radius: 14px; border: 0.5px solid #e5e5e0; padding: 1rem 1.1rem; margin-bottom: .875rem; }
   .card-title { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .75rem; }
@@ -144,6 +145,19 @@
   .summary-card.has-bg [style*="font-size:14px"] { color: rgba(255,255,255,0.9); }
   .summary-card.has-bg [style*="height:0.5px;background:#f0f0ec"] { background: rgba(255,255,255,0.15) !important; }
   .summary-card.has-bg .sum-avatar { background: rgba(255,255,255,0.2); color: #fff; }
+
+  /* Live indicator */
+  .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #dc2626; margin-right: 4px; animation: livepulse 1.4s ease-in-out infinite; vertical-align: middle; }
+  @keyframes livepulse { 0%,100%{opacity:1}50%{opacity:.2} }
+
+  /* Share toast */
+  #share-toast { position: fixed; top: 1.25rem; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 10px 22px; border-radius: 24px; font-size: 14px; font-weight: 600; z-index: 200; pointer-events: none; white-space: nowrap; transition: opacity .25s; }
+
+  /* Player view courts */
+  .pv-court-card { background: #fff; border-radius: 14px; border: 0.5px solid #e5e5e0; padding: 1rem 1.1rem; margin-bottom: .75rem; }
+  .pv-teams-row { display: flex; align-items: center; margin-top: .625rem; gap: 6px; }
+  .pv-team { flex: 1; font-size: 14px; font-weight: 600; line-height: 1.6; }
+  .pv-score-box { font-size: 22px; font-weight: 800; color: #1a1a1a; text-align: center; padding: 0 8px; flex-shrink: 0; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -197,11 +211,15 @@
             <div style="font-size:11px;font-weight:700;color:#5b4fcf;text-transform:uppercase;letter-spacing:.06em">Round</div>
             <div style="font-size:26px;font-weight:800;line-height:1.1" id="round-num">1</div>
           </div>
-          <div style="text-align:center;font-size:13px;font-weight:600;color:#aaa;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="game-session-name"></div>
+          <div style="text-align:center;font-size:13px;font-weight:600;color:#aaa;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="game-session-name"></div>
           <div style="text-align:right">
             <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em">Points</div>
             <div style="font-size:26px;font-weight:800;line-height:1.1" id="total-points">0</div>
           </div>
+        </div>
+        <div id="share-row" style="display:none;margin-top:10px;padding-top:10px;border-top:0.5px solid #f0f0ec;align-items:center;justify-content:space-between">
+          <span style="font-size:11px;color:#bbb;font-weight:600;letter-spacing:.04em" id="session-code-display"></span>
+          <button class="btn btn-secondary btn-sm" style="font-size:13px;padding:7px 16px;min-height:36px" onclick="shareInstant()">📡 Share live</button>
         </div>
       </div>
 
@@ -331,7 +349,17 @@
     <button class="btn btn-secondary btn-full" onclick="resetGame()">New game</button>
     <div style="height:.5rem"></div>
   </div>
+
+  <!-- PLAYER VIEW (read-only live) -->
+  <div id="view-player" style="display:none">
+    <div id="pv-loading" style="text-align:center;padding:3rem 0;color:#bbb;font-size:15px">Loading session...</div>
+    <div id="pv-content"></div>
+    <div id="pv-finished"></div>
+    <div style="height:2rem"></div>
+  </div>
 </div>
+
+<div id="share-toast" style="display:none">Link copied!</div>
 
 <div class="sticky-actions" id="sticky-bar" style="display:none">
   <div class="sticky-inner">
@@ -342,8 +370,26 @@
 </div>
 
 <input type="file" id="bg-file-input" accept="image/*" style="display:none" />
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
+
+// ── FIREBASE ──────────────────────────────────────────────────────────────────
+
+firebase.initializeApp({
+  apiKey: "AIzaSyCE6QbASYqnzLqITmE2K1hPTKOH3VLdA9I",
+  authDomain: "mabar-tennis.firebaseapp.com",
+  projectId: "mabar-tennis",
+  storageBucket: "mabar-tennis.firebasestorage.app",
+  messagingSenderId: "851060893421",
+  appId: "1:851060893421:web:d25694c8f98657169f8ee4"
+});
+const db = firebase.firestore();
+
+// ── GLOBALS ───────────────────────────────────────────────────────────────────
+
 let setupCourts = 1;
 let editingHistoryRound = null;
 let summaryEditingRound = null;
@@ -357,6 +403,8 @@ let state = {
   sessionName: '',
   bgPhoto: null,
   bgPhotoY: 35,
+  sessionCode: null,
+  isFinished: false,
   courts: [],
   sittingOut: [],
   history: [],
@@ -365,9 +413,13 @@ let state = {
   absentNext: new Set()
 };
 
+// ── PERSISTENCE ───────────────────────────────────────────────────────────────
+
 function save() {
   try { localStorage.setItem('mabar_v2', JSON.stringify(state, (k,v) => v instanceof Set ? [...v] : v)); } catch(e){}
+  saveToFirestore();
 }
+
 function load() {
   try {
     const d = localStorage.getItem('mabar_v2');
@@ -378,10 +430,238 @@ function load() {
       p.opponentHistory = p.opponentHistory || {};
       (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; });
       if (p.bgPhotoY == null) p.bgPhotoY = 35;
+      if (p.sessionCode == null) p.sessionCode = null;
+      if (p.isFinished == null) p.isFinished = false;
       state = p;
     }
   } catch(e){}
 }
+
+// ── FIRESTORE SYNC ────────────────────────────────────────────────────────────
+
+function generateSessionCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+let _firestoreTimer = null;
+function saveToFirestore() {
+  if (!state.sessionCode) return;
+  clearTimeout(_firestoreTimer);
+  _firestoreTimer = setTimeout(async () => {
+    try {
+      const payload = JSON.parse(JSON.stringify(state, (k, v) => {
+        if (k === 'bgPhoto') return null;
+        if (v instanceof Set) return [...v];
+        return v;
+      }));
+      await db.collection('sessions').doc(state.sessionCode).set({
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        sessionName: state.sessionName || '',
+        round: state.round,
+        isFinished: state.isFinished || false,
+        payload: JSON.stringify(payload)
+      });
+    } catch(e) { console.warn('Firestore sync failed:', e); }
+  }, 1500);
+}
+
+// ── SHARE MODAL ───────────────────────────────────────────────────────────────
+
+function updateShareUI() {
+  const row = document.getElementById('share-row');
+  const codeEl = document.getElementById('session-code-display');
+  if (state.sessionCode && row) {
+    codeEl.textContent = state.sessionCode;
+    row.style.display = 'flex';
+  }
+}
+
+function shareLink() {
+  return location.origin + '/?code=' + state.sessionCode;
+}
+
+function shareInstant() {
+  const link = shareLink();
+  if (navigator.share) {
+    navigator.share({ title: state.sessionName || 'Tennis Mabar', url: link }).catch(() => {});
+    return;
+  }
+  navigator.clipboard.writeText(link).then(() => showShareToast('Link copied!')).catch(() => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = link; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showShareToast('Link copied!');
+    } catch(e) { showShareToast('Could not copy'); }
+  });
+}
+
+function showShareToast(msg) {
+  const t = document.getElementById('share-toast');
+  t.textContent = msg; t.style.display = 'block'; t.style.opacity = '1';
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => { t.style.display = 'none'; }, 280); }, 2200);
+}
+
+// ── PLAYER VIEW ───────────────────────────────────────────────────────────────
+
+function initPlayerView(code) {
+  document.getElementById('view-setup').style.display = 'none';
+  document.getElementById('view-game').style.display = 'none';
+  document.getElementById('view-summary').style.display = 'none';
+  document.getElementById('view-player').style.display = 'block';
+  document.getElementById('tab-bar').style.display = 'none';
+  document.getElementById('sticky-bar').style.display = 'none';
+  document.getElementById('phase-badge').className = 'badge badge-live';
+  document.getElementById('phase-badge').innerHTML = '<span class="live-dot"></span>Live';
+
+  db.collection('sessions').doc(code).onSnapshot(doc => {
+    if (!doc.exists) {
+      document.getElementById('pv-loading').innerHTML = 'Session not found.<br><span style="font-size:13px;color:#bbb">Check the link and try again.</span>';
+      return;
+    }
+    const data = doc.data();
+    let s;
+    try { s = JSON.parse(data.payload); } catch(e) { return; }
+    s.absentNext = new Set(s.absentNext || []);
+
+    document.getElementById('pv-loading').style.display = 'none';
+    document.querySelector('header h1').textContent = '🎾 ' + (s.sessionName || 'Live Session');
+
+    if (data.isFinished) {
+      document.getElementById('pv-content').style.display = 'none';
+      document.getElementById('pv-finished').style.display = 'block';
+      document.getElementById('phase-badge').className = 'badge badge-setup';
+      document.getElementById('phase-badge').textContent = 'Finished';
+      renderPlayerSummary(s);
+    } else {
+      document.getElementById('pv-content').style.display = 'block';
+      document.getElementById('pv-finished').style.display = 'none';
+      renderPlayerLive(s, data.round);
+    }
+  }, () => {
+    document.getElementById('pv-loading').textContent = 'Connection error. Try refreshing.';
+  });
+}
+
+function pvInitials(name) {
+  return (name || '?').trim().split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2) || '?';
+}
+
+function pvScore(val) {
+  return (val !== '' && val !== null && val !== undefined) ? val : '—';
+}
+
+function renderPlayerLive(s, round) {
+  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  const totalPts = s.players.reduce((t, p) => t + (p.score || 0), 0);
+
+  let html = `
+    <div class="card" style="margin-bottom:.875rem">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#5b4fcf;text-transform:uppercase;letter-spacing:.06em">Round</div>
+          <div style="font-size:26px;font-weight:800;line-height:1.1">${round || '—'}</div>
+        </div>
+        <div style="text-align:center;font-size:13px;font-weight:600;color:#aaa">${s.sessionName || ''}</div>
+        <div style="text-align:right">
+          <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em">Total pts</div>
+          <div style="font-size:26px;font-weight:800;line-height:1.1">${totalPts}</div>
+        </div>
+      </div>
+    </div>`;
+
+  (s.courts || []).forEach((c, i) => {
+    html += `
+      <div class="pv-court-card">
+        <span class="court-label">Court ${i + 1}</span>
+        <div class="pv-teams-row">
+          <div class="pv-team">${(c.team1 || []).join('<br>')}</div>
+          <div class="pv-score-box">${pvScore(c.score1)}<br><span style="font-size:12px;color:#ccc;font-weight:400">vs</span><br>${pvScore(c.score2)}</div>
+          <div class="pv-team" style="text-align:right">${(c.team2 || []).join('<br>')}</div>
+        </div>
+      </div>`;
+  });
+
+  if (s.sittingOut && s.sittingOut.length) {
+    html += `<div class="card" style="margin-bottom:.875rem">
+      <div class="card-title">Sitting out</div>
+      ${s.sittingOut.map(n => `
+        <div class="player-row">
+          <div class="avatar">${pvInitials(n)}</div>
+          <div class="player-name">${n}</div>
+          <span class="tag tag-rest">Resting</span>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  html += `<div class="card">
+    <div class="card-title">Standings</div>
+    ${sorted.map((p, i) => {
+      const rc = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank';
+      return `<div class="leaderboard-row">
+        <span class="rank ${rc}">${i + 1}</span>
+        <div class="avatar" style="width:32px;height:32px;font-size:12px">${pvInitials(p.name)}</div>
+        <span class="player-name">${p.name}</span>
+        <span style="font-size:13px;color:#bbb;margin-right:6px">${p.courtsPlayed || 0} played</span>
+        <span class="player-score">${p.score || 0}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+
+  document.getElementById('pv-content').innerHTML = html;
+}
+
+function renderPlayerSummary(s) {
+  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  const podiumOrder = [sorted[1], sorted[0], sorted[2]].filter(Boolean);
+  const avCls = ['podium-avatar-2', 'podium-avatar-1', 'podium-avatar-3'];
+  const blCls = ['podium-block-2', 'podium-block-1', 'podium-block-3'];
+  const medals = ['🥈', '🥇', '🥉'];
+
+  const podiumHtml = podiumOrder.map((p, i) => `
+    <div class="podium-slot">
+      <div class="podium-avatar ${avCls[i]}">${pvInitials(p.name)}</div>
+      <div class="podium-name">${p.name}</div>
+      <div class="podium-pts">${p.score || 0} pts</div>
+      <div class="podium-pts">${p.courtsPlayed || 0} played</div>
+      <div class="podium-block ${blCls[i]}">${medals[i]}</div>
+    </div>`).join('');
+
+  const listHtml = sorted.slice(3).map((p, i) => `
+    <div class="summary-row">
+      <span class="medal" style="font-size:12px;font-weight:700;color:#bbb">${i + 4}</span>
+      <div class="sum-avatar">${pvInitials(p.name)}</div>
+      <span style="flex:1;font-size:14px">${p.name}</span>
+      <span style="font-size:12px;color:#aaa;margin-right:8px">${p.courtsPlayed || 0} played</span>
+      <span style="font-size:15px;font-weight:700">${p.score || 0}</span>
+    </div>`).join('');
+
+  document.getElementById('pv-finished').innerHTML = `
+    <div class="summary-card">
+      <div class="summary-card-inner">
+        <div style="text-align:center;margin-bottom:1rem">
+          <div style="font-size:24px">🎾</div>
+          <div class="session-title-display">${s.sessionName || 'Session Complete'}</div>
+        </div>
+        <div style="display:flex;justify-content:center;gap:2rem;margin-bottom:1.5rem">
+          <div class="summary-stat"><div class="summary-stat-val">${(s.history || []).length}</div><div class="summary-stat-label">Rounds</div></div>
+          <div class="summary-stat"><div class="summary-stat-val">${s.players.length}</div><div class="summary-stat-label">Players</div></div>
+          <div class="summary-stat"><div class="summary-stat-val">${s.players.reduce((t,p)=>t+(p.score||0),0)}</div><div class="summary-stat-label">Total pts</div></div>
+        </div>
+        <div class="podium">${podiumHtml}</div>
+        <div style="height:0.5px;background:#f0f0ec;margin:1rem 0"></div>
+        ${listHtml}
+        <div style="text-align:center;margin-top:1rem;font-size:10px;color:#ccc;letter-spacing:.05em">Tennis Mabar App by Agoes Santosa</div>
+      </div>
+    </div>`;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
 
 function initials(name) {
   return name.trim().split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2) || '?';
@@ -428,6 +708,7 @@ function startGame() {
   err.style.display = 'none';
   state.maxCourts = setupCourts;
   state.sessionName = document.getElementById('session-name-input').value.trim();
+  state.sessionCode = generateSessionCode();
   document.getElementById('view-setup').style.display = 'none';
   document.getElementById('view-game').style.display = 'block';
   document.getElementById('tab-bar').style.display = 'flex';
@@ -435,6 +716,7 @@ function startGame() {
   document.getElementById('phase-badge').textContent = 'Round 1';
   document.getElementById('phase-badge').className = 'badge badge-round';
   document.getElementById('game-session-name').textContent = state.sessionName;
+  updateShareUI();
   generateRound();
 }
 
@@ -462,9 +744,6 @@ function smartSelectPlayers(active) {
   const played = shuffle(active.filter(p =>  justPlayed.has(p.name)));
   const numCourts = Math.min(Math.floor(active.length / 4), state.maxCourts);
   const numSlots  = numCourts * 4;
-  // Exact match means the same two groups would alternate forever.
-  // Only swap once everyone has played at least once (so new/unplayed players
-  // always get priority first before the mixing logic kicks in).
   const everyoneHasPlayed = active.every(p => p.courtsPlayed > 0);
   if (rested.length === numSlots && played.length > 0 && everyoneHasPlayed) {
     played.push(rested.pop());
@@ -473,7 +752,6 @@ function smartSelectPlayers(active) {
 }
 
 function formPairs(players) {
-  // Greedy: for each player, pick the partner they've played with least
   const remaining = [...players];
   const pairs = [];
   while (remaining.length >= 2) {
@@ -489,8 +767,6 @@ function formPairs(players) {
 }
 
 function courtMatchScore(p1, p2) {
-  // Reward: former partners now facing off (good variety)
-  // Penalise: repeat opponents
   let score = 0;
   p1.forEach(a => p2.forEach(b => {
     score += getPartnerCount(a.name, b.name) * 3;
@@ -500,7 +776,6 @@ function courtMatchScore(p1, p2) {
 }
 
 function bestCourtAssignment(pairs) {
-  // Recursively try all matchup permutations, return highest-scoring assignment
   if (pairs.length === 0) return { courts:[], score:0 };
   let best = null;
   for (let i=1; i<pairs.length; i++) {
@@ -531,7 +806,6 @@ function generateRound(advance=true) {
   document.getElementById('round-banner').style.display = 'none';
 
   if (advance && nextRoundCache) {
-    // Reuse the cached preview — what you saw is exactly what you get
     state.courts     = nextRoundCache.courts;
     state.sittingOut = nextRoundCache.sittingOut;
   } else {
@@ -646,8 +920,6 @@ function computeNextRound() {
   const numCourts = Math.min(Math.floor(active.length/4), state.maxCourts);
   const numPlaying = numCourts * 4;
 
-  // Use current (unsaved) courts as "just played" reference — this matches what
-  // generateRound() will see in history[0] after submitRound() saves them.
   const srcCourts = state.courts.length ? state.courts
     : (state.history.length ? state.history[0].courts : []);
   const justPlayed = new Set(srcCourts.flatMap(c => [...(c.team1||[]), ...(c.team2||[])]));
@@ -656,7 +928,6 @@ function computeNextRound() {
   const played  = shuffle(active.filter(p =>  justPlayed.has(p.name)));
   const numSlots = numPlaying;
 
-  // Include current-round players in the everyoneHasPlayed check
   const everyoneHasPlayed = active.every(p => p.courtsPlayed > 0 || justPlayed.has(p.name));
   if (rested.length === numSlots && played.length > 0 && everyoneHasPlayed) {
     played.push(rested.pop());
@@ -875,7 +1146,6 @@ function renderHistory() {
 function editHistoryRound(round) {
   editingHistoryRound = round;
   renderHistory();
-  // Scroll to the edit inputs
   setTimeout(() => document.getElementById(`he_${round}_0_1`)?.scrollIntoView({behavior:'smooth',block:'center'}), 50);
 }
 
@@ -1017,18 +1287,20 @@ function switchTab(tab) {
 
 function finishSession() {
   if (!confirm('End this session and go to the summary?')) return;
+  state.isFinished = true;
   document.getElementById('view-game').style.display = 'none';
   document.getElementById('tab-bar').style.display = 'none';
   document.getElementById('sticky-bar').style.display = 'none';
   document.getElementById('phase-badge').textContent = 'Finished';
   document.getElementById('phase-badge').className = 'badge badge-setup';
   document.getElementById('view-summary').style.display = 'block';
+  save();
   renderSummary();
 }
 
 function resetGame() {
   if (!confirm('Reset everything and start a new game?')) return;
-  state = { players:[], round:0, maxCourts:1, sessionName:'', bgPhoto:null, bgPhotoY:35, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, absentNext:new Set() };
+  state = { players:[], round:0, maxCourts:1, sessionName:'', bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, absentNext:new Set() };
   save(); location.reload();
 }
 
@@ -1049,7 +1321,6 @@ function renderSummaryBoard() {
       <div class="podium-block ${blCls[i]}">${podiumMedals[i]}</div>
     </div>`).join('');
 
-  // Top 3 already shown in the podium — start the list from rank #4
   document.getElementById('summary-full-board').innerHTML = sorted.slice(3).map((p,i) =>
     `<div class="summary-row">
       <span class="medal" style="font-size:12px;font-weight:700;color:#bbb">${i+4}</span>
@@ -1171,21 +1442,35 @@ function buildShareText() {
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
-load();
+const _playerViewCode = new URLSearchParams(location.search).get('code');
 
-if (state.round > 0 && state.players.length >= 4) {
-  setupCourts = state.maxCourts || 1;
-  document.getElementById('view-setup').style.display = 'none';
-  document.getElementById('view-game').style.display = 'block';
-  document.getElementById('tab-bar').style.display = 'flex';
-  document.getElementById('sticky-bar').style.display = 'block';
-  document.getElementById('phase-badge').textContent = 'Round ' + state.round;
-  document.getElementById('phase-badge').className = 'badge badge-round';
-  document.getElementById('game-session-name').textContent = state.sessionName || '';
-  renderCourts(); renderAbsentToggles(); renderLeaderboard(); renderHistory();
+if (_playerViewCode) {
+  initPlayerView(_playerViewCode);
 } else {
-  document.getElementById('courts-count-display').textContent = setupCourts;
-  renderSetup();
+  load();
+
+  if (state.isFinished && state.round > 0) {
+    setupCourts = state.maxCourts || 1;
+    document.getElementById('view-setup').style.display = 'none';
+    document.getElementById('phase-badge').textContent = 'Finished';
+    document.getElementById('phase-badge').className = 'badge badge-setup';
+    document.getElementById('view-summary').style.display = 'block';
+    renderSummary();
+  } else if (state.round > 0 && state.players.length >= 4) {
+    setupCourts = state.maxCourts || 1;
+    document.getElementById('view-setup').style.display = 'none';
+    document.getElementById('view-game').style.display = 'block';
+    document.getElementById('tab-bar').style.display = 'flex';
+    document.getElementById('sticky-bar').style.display = 'block';
+    document.getElementById('phase-badge').textContent = 'Round ' + state.round;
+    document.getElementById('phase-badge').className = 'badge badge-round';
+    document.getElementById('game-session-name').textContent = state.sessionName || '';
+    updateShareUI();
+    renderCourts(); renderAbsentToggles(); renderLeaderboard(); renderHistory();
+  } else {
+    document.getElementById('courts-count-display').textContent = setupCourts;
+    renderSetup();
+  }
 }
 </script>
 </body>
