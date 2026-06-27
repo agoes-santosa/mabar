@@ -480,7 +480,8 @@ function updateShareUI() {
 }
 
 function shareLink() {
-  return location.origin + '/?code=' + state.sessionCode;
+  const base = location.href.split('?')[0].replace(/\/index\.html$/, '/');
+  return base + '?code=' + state.sessionCode;
 }
 
 function shareInstant() {
