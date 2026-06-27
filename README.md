@@ -22,6 +22,7 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 - **Score editing** — correct any score mid-session or from the Summary screen; all stats recalculate automatically.
 - **Player management** — mark absences before a round, swap players between courts and the sitting-out bench, or add players mid-session.
 - **Session summary** — podium (with played count per player), full leaderboard from rank #4 down, and round history. Add a background photo with a gradient fade effect, reposition it with a slider, and export or share as an image.
+- **Live sharing** — tap "📡 Share live" during a session to get a short link. Anyone who opens it sees a live read-only view: courts, scores, standings — updating in real time as rounds are saved. When the session ends, the link automatically shows the final summary/podium.
 - **No install needed** — runs entirely in the browser, no account or internet required after first load.
 - **Offline-friendly** — session state is saved in `localStorage` so closing the tab won't lose your data.
 
@@ -38,8 +39,9 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 7. Mark players who are stepping out under **Skip next round**
 8. Tap **＋ Player joining?** to add someone mid-session
 9. Use the **Points / Win % / Pts %** toggles to change how standings are sorted
-10. When done, tap **End** → **Finish session** to see the summary and share results
-11. On the Summary screen, upload a background photo and use the **Reposition ↕** slider to frame the shot
+10. Tap **📡 Share live** in the round card to copy a link — send it to the group so everyone can follow along on their own phone
+11. When done, tap **End** → **Finish session** to see the summary and share results
+12. On the Summary screen, upload a background photo and use the **Reposition ↕** slider to frame the shot
 
 ---
 
@@ -61,6 +63,7 @@ Once players are selected, the app minimises repeat partnerships and promotes fo
 - Single HTML file — HTML, CSS, and vanilla JavaScript
 - No framework, no backend, no build step
 - State persisted in `localStorage` under key `mabar_v2`
+- [Firebase Cloud Firestore](https://firebase.google.com/docs/firestore) (compat SDK via CDN) for live session sharing
 - [`html2canvas`](https://html2canvas.hertzen.com/) for PNG export of the summary card
 - Web Share API for native mobile sharing
 
@@ -86,6 +89,19 @@ open index.html   # macOS
 ---
 
 ## Changelog
+
+### v3 (June 2026)
+
+**Live sharing**
+- Firebase Cloud Firestore integration — session state syncs to the cloud on every save (1.5s debounced)
+- Each session gets a 6-character share code (e.g. `A3K7P2`) generated at game start
+- "📡 Share live" button in the round card — opens native share sheet on mobile, copies to clipboard on desktop
+- Share link: `mabartennis.netlify.app/?code=XXXXXX` — clean short URL, no filename
+- Player view at `?code=XXXXXX`: read-only, real-time updates via Firestore listener; shows courts, scores, standings
+- When session ends, player view automatically switches to the final summary/podium
+
+**Other**
+- Renamed main file to `index.html` — serves at root URL on Netlify, no filename in the address bar
 
 ### v2 (June 2026)
 
