@@ -15,11 +15,11 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 ## Features
 
 - **Smart shuffling** — players who sat out last round get priority; players who just played are deprioritized. Within each group, selection is random. Repeat partnerships and repeat opponents are minimised across rounds using match history.
-- **Next round preview** — tap "👀 Preview next" to see tentative pairings before saving the current round. The preview is guaranteed accurate — what it shows is exactly what will be played.
+- **Next round preview** — always visible below the courts, so players can prepare before the current round ends. Updates live when you mark absences, swap players, or add someone mid-session; tap **🔀 Shuffle** to redraw it. The preview is guaranteed accurate — what it shows is exactly what will be played.
 - **Flexible courts** — set 1 to 6 courts at the start; the app fills them optimally each round.
 - **Multiple sort modes** — view standings by **Points**, **Win %** (wins ÷ courts played), or **Pts %** (points scored ÷ maximum possible). Available in both the in-game Standings tab and the Summary screen.
 - **Live standings** — leaderboard updates after every round, with full round-by-round history.
-- **Score editing** — correct any score mid-session or from the Summary screen; all stats recalculate automatically.
+- **Score & player editing** — correct any score, or even *who actually played*, in any past round — mid-session or from the Summary screen; all stats recalculate automatically.
 - **Player management** — mark absences before a round, swap players between courts and the sitting-out bench, or add players mid-session.
 - **Session summary** — podium (with played count per player), full leaderboard from rank #4 down, and round history. Add a background photo with a gradient fade effect, reposition it with a slider, and export or share as an image.
 - **Live sharing** — tap "📡 Share live" during a session to get a short link. Anyone who opens it sees a live read-only view: courts, scores, standings — updating in real time as rounds are saved. When the session ends, the link automatically shows the final summary/podium.
@@ -89,6 +89,23 @@ open index.html   # macOS
 ---
 
 ## Changelog
+
+### v3.1 (July 2026)
+
+**Fix the right player, get the right standings**
+- Round history editor now edits **players, not just scores** — tap **Edit** on any past round (Standings tab or Summary screen) and every court slot becomes a dropdown. Swap in who actually played, save, and points / played count / wins / Win % / Pts % all recalculate. The round's resting list auto-corrects too.
+- Guard against selecting the same player twice in one round.
+- (Swapping *before* saving a round already credited the right player — this closes the gap for rounds that were saved with the wrong lineup.)
+
+**Always-on next round preview**
+- The preview no longer hides behind a "👀 Preview next" toggle — it's permanently visible below the courts so the next four can get ready.
+- New **🔀 Shuffle** button redraws the preview; tap as many times as you like.
+- The preview updates automatically when you mark someone under "Skip next round", swap a player, or add/remove players mid-session — from any tab.
+- Still guaranteed accurate: the round that gets played is exactly the last preview shown.
+
+**UI polish**
+- Court player names now sit next to the score they belong to — team 1 right-aligned, team 2 left-aligned.
+- Swap is now a compact **⇄** icon button beside each name (no more dropdown): one resting player swaps instantly, several resting players open a small picker.
 
 ### v3 (June 2026)
 

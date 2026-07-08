@@ -52,10 +52,12 @@
   .score-box { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .score-sep { font-size: 14px; font-weight: 700; color: #ccc; }
 
-  .player-slot { display: flex; flex-direction: column; gap: 2px; padding: 4px 0; align-items: flex-start; }
-  .slot-name { font-size: 14px; font-weight: 600; line-height: 1.3; word-break: break-word; }
+  .player-slot { display: flex; flex-direction: row; align-items: center; gap: 6px; padding: 3px 0; }
+  .slot-name { font-size: 14px; font-weight: 600; line-height: 1.3; word-break: break-word; min-width: 0; }
   .slot-name-muted { color: #888; font-weight: 500; }
-  .swap-select { font-size: 11px; color: #5b4fcf; background: #f0effe; border: none; border-radius: 6px; padding: 3px 5px; cursor: pointer; flex-shrink: 0; min-height: 26px; -webkit-appearance: auto; }
+  .swap-btn { background: #f0effe; border: none; border-radius: 6px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 15px; color: #5b4fcf; cursor: pointer; flex-shrink: 0; }
+  #swap-picker { position: fixed; background: #fff; border-radius: 12px; border: 0.5px solid #e5e5e0; padding: 6px; box-shadow: 0 4px 24px rgba(0,0,0,0.15); z-index: 150; min-width: 150px; }
+  .edit-player-sel { font-size: 13px; font-weight: 600; color: #1a1a1a; background: #fafaf8; border: 0.5px solid #d0d0cc; border-radius: 8px; padding: 8px; width: 100%; min-height: 40px; -webkit-appearance: auto; }
 
   .preview-card { background: #fafaf8; border-radius: 12px; border: 0.5px dashed #d0d0cc; padding: .875rem 1rem; margin-bottom: .875rem; }
   .preview-court { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 0.5px solid #f0f0ec; font-size: 13px; }
@@ -230,20 +232,22 @@
         <div id="sitting-out-list"></div>
       </div>
 
-      <div id="preview-section" style="display:none">
+      <div id="preview-section">
         <div class="preview-card">
-          <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem">Next round preview</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+            <span style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.06em">Next round preview</span>
+            <button class="btn btn-secondary btn-sm" style="font-size:13px;color:#5b4fcf;min-height:34px;padding:5px 14px" onclick="reshufflePreview()">🔀 Shuffle</button>
+          </div>
           <div id="preview-content"></div>
-          <div style="font-size:11px;color:#bbb;margin-top:.5rem">Tentative — updates when you change absences</div>
+          <div style="font-size:11px;color:#bbb;margin-top:.5rem">Tentative — updates with absences, swaps &amp; new players</div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-title">Skip next round</div>
         <div id="absent-toggles"></div>
-        <div style="margin-top:.75rem;padding-top:.75rem;border-top:0.5px solid #f0f0ec;display:flex;gap:8px">
-          <button class="btn btn-secondary btn-sm" style="flex:1;font-size:14px" onclick="toggleQuickAdd()">＋ Player joining?</button>
-          <button class="btn btn-secondary btn-sm" style="font-size:13px;color:#5b4fcf" onclick="togglePreview()" id="preview-toggle-btn">👀 Preview next</button>
+        <div style="margin-top:.75rem;padding-top:.75rem;border-top:0.5px solid #f0f0ec">
+          <button class="btn btn-secondary btn-sm btn-full" style="font-size:14px" onclick="toggleQuickAdd()">＋ Player joining?</button>
         </div>
         <div id="quick-add-row" style="display:none;margin-top:8px">
           <div class="add-row" style="margin-top:0">
@@ -360,6 +364,11 @@
 </div>
 
 <div id="share-toast" style="display:none">Link copied!</div>
+
+<div id="swap-picker" style="display:none">
+  <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;padding:4px 12px 2px">Swap with</div>
+  <div id="swap-picker-opts"></div>
+</div>
 
 <div class="sticky-actions" id="sticky-bar" style="display:none">
   <div class="sticky-inner">
@@ -827,7 +836,7 @@ function generateRound(advance=true) {
 
   renderCourts();
   renderAbsentToggles();
-  if (document.getElementById('preview-section').style.display !== 'none') renderNextRoundPreview();
+  renderNextRoundPreview();
   save();
 }
 
@@ -835,18 +844,14 @@ function generateRound(advance=true) {
 
 function playerSlotHtml(courtIdx, team, playerIdx, name, alignRight=false) {
   const inCourt = [...state.courts[courtIdx].team1, ...state.courts[courtIdx].team2];
-  const available = state.sittingOut.filter(n => !inCourt.includes(n) || n===name);
-  const swapSelect = available.length
-    ? `<select class="swap-select" onchange="swapPlayer(${courtIdx},'${team}',${playerIdx},this.value);this.value=''">
-        <option value="" disabled selected>⇄ swap</option>
-        ${available.map(n=>`<option value="${n}">${n}</option>`).join('')}
-       </select>`
+  const available = state.sittingOut.filter(n => !inCourt.includes(n));
+  const swapBtn = available.length
+    ? `<button class="swap-btn" onclick="handleSwap(${courtIdx},'${team}',${playerIdx},this)">⇄</button>`
     : '';
   const isSecond = playerIdx === 1;
-  return `<div class="player-slot" style="${alignRight?'align-items:flex-end':''}">
-    <span class="slot-name ${isSecond?'slot-name-muted':''}" style="${alignRight?'text-align:right':''}">${name}</span>
-    ${swapSelect}
-  </div>`;
+  const nameSpan = `<span class="slot-name${isSecond?' slot-name-muted':''}" style="${alignRight?'text-align:right':'text-align:left'}">${name}</span>`;
+  const inner = alignRight ? `${nameSpan}${swapBtn}` : `${swapBtn}${nameSpan}`;
+  return `<div class="player-slot" style="${alignRight?'justify-content:flex-end':'justify-content:flex-start'}">${inner}</div>`;
 }
 
 function renderCourts() {
@@ -856,8 +861,8 @@ function renderCourts() {
       <span class="court-label">Court ${i+1}</span>
       <div class="vs-row">
         <div class="team">
-          ${playerSlotHtml(i,'team1',0,c.team1[0])}
-          ${playerSlotHtml(i,'team1',1,c.team1[1])}
+          ${playerSlotHtml(i,'team1',0,c.team1[0],true)}
+          ${playerSlotHtml(i,'team1',1,c.team1[1],true)}
         </div>
         <div class="score-box">
           <input type="number" min="0" max="99" value="${c.score1}" placeholder="0"
@@ -867,8 +872,8 @@ function renderCourts() {
             oninput="state.courts[${i}].score2=this.value;updateTotal()" inputmode="numeric" />
         </div>
         <div class="team">
-          ${playerSlotHtml(i,'team2',0,c.team2[0],true)}
-          ${playerSlotHtml(i,'team2',1,c.team2[1],true)}
+          ${playerSlotHtml(i,'team2',0,c.team2[0],false)}
+          ${playerSlotHtml(i,'team2',1,c.team2[1],false)}
         </div>
       </div>
     </div>`).join('');
@@ -902,18 +907,43 @@ function swapPlayer(courtIdx, team, playerIdx, newName) {
   nextRoundCache = null;
   save();
   renderCourts();
-  if (document.getElementById('preview-section').style.display !== 'none') renderNextRoundPreview();
+  renderNextRoundPreview();
 }
+
+let _pendingSwap = null;
+function handleSwap(courtIdx, team, playerIdx, btn) {
+  const inCourt = [...state.courts[courtIdx].team1, ...state.courts[courtIdx].team2];
+  const available = state.sittingOut.filter(n => !inCourt.includes(n));
+  if (!available.length) return;
+  if (available.length === 1) { swapPlayer(courtIdx, team, playerIdx, available[0]); return; }
+  _pendingSwap = {courtIdx, team, playerIdx};
+  const picker = document.getElementById('swap-picker');
+  document.getElementById('swap-picker-opts').innerHTML = available.map(n =>
+    `<button onclick="doSwapFromPicker('${n}')" style="display:block;width:100%;text-align:left;background:none;border:none;padding:9px 12px;font-size:15px;cursor:pointer;border-radius:8px;font-weight:600;color:#1a1a1a">${n}</button>`
+  ).join('');
+  const r = btn.getBoundingClientRect();
+  picker.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 170)) + 'px';
+  picker.style.top = (r.bottom + 6) + 'px';
+  picker.style.display = 'block';
+}
+function doSwapFromPicker(name) {
+  if (!_pendingSwap) return;
+  swapPlayer(_pendingSwap.courtIdx, _pendingSwap.team, _pendingSwap.playerIdx, name);
+  _pendingSwap = null;
+  document.getElementById('swap-picker').style.display = 'none';
+}
+document.addEventListener('click', e => {
+  const p = document.getElementById('swap-picker');
+  if (p && p.style.display !== 'none' && !p.contains(e.target) && !e.target.classList.contains('swap-btn')) {
+    p.style.display = 'none'; _pendingSwap = null;
+  }
+}, true);
 
 // ── PREVIEW ───────────────────────────────────────────────────────────────────
 
-function togglePreview() {
-  const sec = document.getElementById('preview-section');
-  const btn = document.getElementById('preview-toggle-btn');
-  const visible = sec.style.display !== 'none';
-  sec.style.display = visible ? 'none' : 'block';
-  btn.style.color = visible ? '#5b4fcf' : '#166534';
-  if (!visible) renderNextRoundPreview();
+function reshufflePreview() {
+  nextRoundCache = null;
+  renderNextRoundPreview();
 }
 
 function computeNextRound() {
@@ -942,7 +972,7 @@ function computeNextRound() {
 }
 
 function renderNextRoundPreview() {
-  const { courts, sittingOut } = computeNextRound();
+  const { courts, sittingOut } = nextRoundCache || computeNextRound();
   const el = document.getElementById('preview-content');
   if (!courts.length) { el.innerHTML = '<div style="font-size:13px;color:#bbb">Not enough active players for a court.</div>'; return; }
   el.innerHTML = courts.map((c,i) => `
@@ -970,7 +1000,7 @@ function toggleAbsent(name, checked) {
   if (checked) state.absentNext.add(name); else state.absentNext.delete(name);
   nextRoundCache = null;
   renderAbsentToggles();
-  if (document.getElementById('preview-section').style.display !== 'none') renderNextRoundPreview();
+  renderNextRoundPreview();
   save();
 }
 
@@ -991,6 +1021,7 @@ function quickAddPlayer() {
   document.getElementById('quick-add-row').style.display = 'none';
   nextRoundCache = null;
   renderAbsentToggles();
+  renderNextRoundPreview();
   renderLeaderboard();
   save();
   document.getElementById('round-banner-text').textContent = `${name} added — they'll join the next round.`;
@@ -1123,25 +1154,74 @@ function renderHistory() {
                <button class="btn btn-primary btn-sm" style="min-height:32px;padding:4px 12px;font-size:13px" onclick="saveHistoryEdit(${h.round})">Save</button>
                <button class="btn btn-secondary btn-sm" style="min-height:32px;padding:4px 10px;font-size:13px" onclick="cancelHistoryEdit()">Cancel</button>
              </div>`
-          : `<button class="btn btn-secondary btn-sm" style="min-height:32px;padding:4px 10px;font-size:12px;color:#5b4fcf" onclick="editHistoryRound(${h.round})">Edit scores</button>`
+          : `<button class="btn btn-secondary btn-sm" style="min-height:32px;padding:4px 10px;font-size:12px;color:#5b4fcf" onclick="editHistoryRound(${h.round})">Edit</button>`
         }
       </div>
       ${h.courts.map((c,ci) => isEditing
-        ? `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;flex-wrap:wrap">
-             <span style="font-size:12px;color:#aaa;min-width:52px">Court ${ci+1}</span>
-             <span style="font-size:13px;flex:1">${c.team1.join(' & ')}</span>
-             <input type="number" id="he_${h.round}_${ci}_1" value="${c.score1||0}" inputmode="numeric"
-               style="width:52px;height:44px;font-size:16px;font-weight:700;text-align:center;border:0.5px solid #d0d0cc;border-radius:8px;padding:0;background:#fafaf8;outline:none;-webkit-appearance:none;appearance:none" />
-             <span style="color:#ccc;font-weight:700">—</span>
-             <input type="number" id="he_${h.round}_${ci}_2" value="${c.score2||0}" inputmode="numeric"
-               style="width:52px;height:44px;font-size:16px;font-weight:700;text-align:center;border:0.5px solid #d0d0cc;border-radius:8px;padding:0;background:#fafaf8;outline:none;-webkit-appearance:none;appearance:none" />
-             <span style="font-size:13px;flex:1;text-align:right">${c.team2.join(' & ')}</span>
-           </div>`
+        ? roundEditCourtHtml(h.round, ci, c, 'he')
         : `<div class="history-item">Court ${ci+1}: ${c.team1.join(' & ')} ${c.score1||0}–${c.score2||0} ${c.team2.join(' & ')}</div>`
       ).join('')}
       ${h.sittingOut&&h.sittingOut.length?`<div style="font-size:11px;color:#bbb;margin-top:3px">Resting: ${h.sittingOut.join(', ')}</div>`:''}
     </div>`;
   }).join('');
+}
+
+// Shared round editor: players (dropdowns) + scores, used by Standings tab ('he') and Summary ('sme')
+function roundEditCourtHtml(round, ci, c, prefix) {
+  const names = state.players.map(p=>p.name).sort((a,b)=>a.localeCompare(b));
+  const sel = (id, cur) => `<select id="${id}" class="edit-player-sel">
+      ${cur ? '' : '<option value="" selected>—</option>'}
+      ${names.map(n=>`<option value="${n}"${n===cur?' selected':''}>${n}</option>`).join('')}
+    </select>`;
+  const scoreInput = (id, val) => `<input type="number" id="${id}" value="${val||0}" inputmode="numeric"
+    style="width:52px;height:44px;font-size:16px;font-weight:700;text-align:center;border:0.5px solid #d0d0cc;border-radius:8px;padding:0;background:#fafaf8;outline:none;-webkit-appearance:none;appearance:none" />`;
+  return `<div style="padding:6px 0 10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:12px;color:#aaa;flex:1">Court ${ci+1}</span>
+        ${scoreInput(`${prefix}_${round}_${ci}_1`, c.score1)}
+        <span style="color:#ccc;font-weight:700">—</span>
+        ${scoreInput(`${prefix}_${round}_${ci}_2`, c.score2)}
+        <span style="flex:1"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+          ${sel(`${prefix}_${round}_${ci}_t1a`, c.team1[0])}
+          ${sel(`${prefix}_${round}_${ci}_t1b`, c.team1[1])}
+        </div>
+        <span style="font-size:11px;font-weight:700;color:#ccc">vs</span>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+          ${sel(`${prefix}_${round}_${ci}_t2a`, c.team2[0])}
+          ${sel(`${prefix}_${round}_${ci}_t2b`, c.team2[1])}
+        </div>
+      </div>
+    </div>`;
+}
+
+function applyRoundEdit(round, prefix) {
+  const h = state.history.find(x=>x.round===round);
+  if (!h) return false;
+  const picked = [];
+  const newCourts = h.courts.map((c,ci) => {
+    const g = id => document.getElementById(`${prefix}_${round}_${ci}_${id}`);
+    const t1 = [g('t1a').value, g('t1b').value].filter(Boolean);
+    const t2 = [g('t2a').value, g('t2b').value].filter(Boolean);
+    picked.push(...t1, ...t2);
+    return { team1:t1, team2:t2, score1:parseInt(g('1').value)||0, score2:parseInt(g('2').value)||0 };
+  });
+  if (new Set(picked).size !== picked.length) {
+    alert('Same player selected more than once in this round.');
+    return false;
+  }
+  const before = h.courts.flatMap(c=>[...c.team1,...c.team2]);
+  const after = new Set(picked);
+  h.courts = newCourts;
+  h.sittingOut = [
+    ...(h.sittingOut||[]).filter(n=>!after.has(n)),
+    ...before.filter(n=>!after.has(n) && !(h.sittingOut||[]).includes(n))
+  ];
+  recalcAll();
+  save();
+  return true;
 }
 
 function editHistoryRound(round) {
@@ -1151,15 +1231,8 @@ function editHistoryRound(round) {
 }
 
 function saveHistoryEdit(round) {
-  const h = state.history.find(x=>x.round===round);
-  if (!h) return;
-  h.courts.forEach((c,ci) => {
-    c.score1 = parseInt(document.getElementById(`he_${round}_${ci}_1`)?.value) || 0;
-    c.score2 = parseInt(document.getElementById(`he_${round}_${ci}_2`)?.value) || 0;
-  });
+  if (!applyRoundEdit(round, 'he')) return;
   editingHistoryRound = null;
-  recalcAll();
-  save();
   renderLeaderboard();
   renderHistory();
 }
@@ -1195,16 +1268,7 @@ function renderSummaryHistory() {
         }
       </div>
       ${h.courts.map((c,ci) => isEditing
-        ? `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;flex-wrap:wrap">
-             <span style="font-size:12px;color:#aaa;min-width:52px">Court ${ci+1}</span>
-             <span style="font-size:13px;flex:1">${c.team1.join(' & ')}</span>
-             <input type="number" id="sme_${h.round}_${ci}_1" value="${c.score1||0}" inputmode="numeric"
-               style="width:52px;height:44px;font-size:16px;font-weight:700;text-align:center;border:0.5px solid #d0d0cc;border-radius:8px;padding:0;background:#fafaf8;outline:none;-webkit-appearance:none;appearance:none" />
-             <span style="color:#ccc;font-weight:700">—</span>
-             <input type="number" id="sme_${h.round}_${ci}_2" value="${c.score2||0}" inputmode="numeric"
-               style="width:52px;height:44px;font-size:16px;font-weight:700;text-align:center;border:0.5px solid #d0d0cc;border-radius:8px;padding:0;background:#fafaf8;outline:none;-webkit-appearance:none;appearance:none" />
-             <span style="font-size:13px;flex:1;text-align:right">${c.team2.join(' & ')}</span>
-           </div>`
+        ? roundEditCourtHtml(h.round, ci, c, 'sme')
         : `<div class="history-item">Court ${ci+1}: ${c.team1.join(' & ')} ${c.score1||0}–${c.score2||0} ${c.team2.join(' & ')}</div>`
       ).join('')}
       ${h.sittingOut&&h.sittingOut.length?`<div style="font-size:11px;color:#bbb;margin-top:3px">Resting: ${h.sittingOut.join(', ')}</div>`:''}
@@ -1219,16 +1283,9 @@ function startSummaryHistoryEdit(round) {
 }
 
 function saveSummaryHistoryEdit(round) {
-  const h = state.history.find(x=>x.round===round);
-  if (!h) return;
-  h.courts.forEach((c,ci) => {
-    c.score1 = parseInt(document.getElementById(`sme_${round}_${ci}_1`)?.value) || 0;
-    c.score2 = parseInt(document.getElementById(`sme_${round}_${ci}_2`)?.value) || 0;
-  });
+  if (!applyRoundEdit(round, 'sme')) return;
   summaryEditingRound = null;
-  recalcAll();
   cachedCanvas = null;
-  save();
   renderSummary();
   renderSummaryHistory();
 }
@@ -1247,7 +1304,8 @@ function addPlayerMidGame() {
   if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
   state.players.push({ name, score:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
   inp.value = '';
-  renderPlayerListGame(); renderAbsentToggles(); renderLeaderboard(); save();
+  nextRoundCache = null;
+  renderPlayerListGame(); renderAbsentToggles(); renderNextRoundPreview(); renderLeaderboard(); save();
 }
 
 function removePlayerGame(name) {
@@ -1259,7 +1317,8 @@ function removePlayerGame(name) {
     c.team2=c.team2.filter(n=>n!==name);
   });
   state.sittingOut = state.sittingOut.filter(n=>n!==name);
-  renderPlayerListGame(); renderCourts(); renderAbsentToggles(); renderLeaderboard(); save();
+  nextRoundCache = null;
+  renderPlayerListGame(); renderCourts(); renderAbsentToggles(); renderNextRoundPreview(); renderLeaderboard(); save();
 }
 
 function renderPlayerListGame() {
@@ -1467,7 +1526,7 @@ if (_playerViewCode) {
     document.getElementById('phase-badge').className = 'badge badge-round';
     document.getElementById('game-session-name').textContent = state.sessionName || '';
     updateShareUI();
-    renderCourts(); renderAbsentToggles(); renderLeaderboard(); renderHistory();
+    renderCourts(); renderAbsentToggles(); renderNextRoundPreview(); renderLeaderboard(); renderHistory();
   } else {
     document.getElementById('courts-count-display').textContent = setupCourts;
     renderSetup();
