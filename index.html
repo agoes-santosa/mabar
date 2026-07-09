@@ -95,6 +95,12 @@
   .round-banner { background: #d6f0e0; border: 0.5px solid #a7f3d0; border-radius: 12px; padding: 12px 16px; margin-bottom: 1rem; font-size: 14px; color: #166534; font-weight: 600; display: flex; align-items: center; gap: 10px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 
+  .mode-toggle-row { display: flex; gap: 8px; }
+  .mode-btn { flex: 1; border: 1.5px solid #e5e5e0; background: #fff; border-radius: 12px; padding: 12px 8px; font-size: 15px; font-weight: 600; color: #888; cursor: pointer; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+  .mode-btn.active { border-color: #5b4fcf; background: #f0effe; color: #5b4fcf; }
+  .mode-btn .mode-sub { font-size: 11px; font-weight: 500; color: #aaa; }
+  .mode-btn.active .mode-sub { color: #8d84e0; }
+
   .court-counter { display: flex; align-items: center; gap: 16px; }
   .counter-btn { width: 44px; height: 44px; border-radius: 50%; border: 0.5px solid #d0d0cc; background: #fff; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #333; }
   .counter-val { font-size: 28px; font-weight: 700; min-width: 32px; text-align: center; }
@@ -177,6 +183,19 @@
 
   <!-- SETUP -->
   <div id="view-setup">
+    <div class="card">
+      <div class="card-title">Game mode</div>
+      <div class="mode-toggle-row">
+        <button class="mode-btn active" id="mode-doubles-btn" onclick="setGameMode('doubles')">
+          <span>👥 Doubles</span>
+          <span class="mode-sub">2 vs 2</span>
+        </button>
+        <button class="mode-btn" id="mode-singles-btn" onclick="setGameMode('singles')">
+          <span>👤 Singles</span>
+          <span class="mode-sub">1 vs 1</span>
+        </button>
+      </div>
+    </div>
     <div class="card">
       <div class="card-title">Session name</div>
       <input type="text" id="session-name-input" placeholder="e.g. Saturday Morning" />
@@ -400,16 +419,27 @@ const db = firebase.firestore();
 // ── GLOBALS ───────────────────────────────────────────────────────────────────
 
 let setupCourts = 1;
+let setupMode = 'doubles';
 let editingHistoryRound = null;
 let summaryEditingRound = null;
 let sortMode = 'points';
 let nextRoundCache = null;
+
+// Players per court: 4 in doubles, 2 in singles
+function perCourt() { return state.gameMode === 'singles' ? 2 : 4; }
+
+function setGameMode(m) {
+  setupMode = m;
+  document.getElementById('mode-doubles-btn').classList.toggle('active', m === 'doubles');
+  document.getElementById('mode-singles-btn').classList.toggle('active', m === 'singles');
+}
 
 let state = {
   players: [],
   round: 0,
   maxCourts: 1,
   sessionName: '',
+  gameMode: 'doubles',
   bgPhoto: null,
   bgPhotoY: 35,
   sessionCode: null,
@@ -441,6 +471,7 @@ function load() {
       if (p.bgPhotoY == null) p.bgPhotoY = 35;
       if (p.sessionCode == null) p.sessionCode = null;
       if (p.isFinished == null) p.isFinished = false;
+      if (p.gameMode == null) p.gameMode = 'doubles';
       state = p;
     }
   } catch(e){}
@@ -712,9 +743,17 @@ function removePlayerSetup(i) {
   renderSetup(); save();
 }
 
+function sessionLabel() {
+  const nm = state.sessionName || '';
+  if (state.gameMode !== 'singles') return nm;
+  return nm ? nm + ' • Singles' : 'Singles';
+}
+
 function startGame() {
   const err = document.getElementById('start-error');
-  if (state.players.length < 4) { err.textContent='Need at least 4 players to start.'; err.style.display='block'; return; }
+  state.gameMode = setupMode;
+  const minP = perCourt();
+  if (state.players.length < minP) { err.textContent=`Need at least ${minP} players to start.`; err.style.display='block'; return; }
   err.style.display = 'none';
   state.maxCourts = setupCourts;
   state.sessionName = document.getElementById('session-name-input').value.trim();
@@ -725,8 +764,9 @@ function startGame() {
   document.getElementById('sticky-bar').style.display = 'block';
   document.getElementById('phase-badge').textContent = 'Round 1';
   document.getElementById('phase-badge').className = 'badge badge-round';
-  document.getElementById('game-session-name').textContent = state.sessionName;
+  document.getElementById('game-session-name').textContent = sessionLabel();
   updateShareUI();
+  nextRoundCache = null;
   generateRound();
 }
 
@@ -752,8 +792,8 @@ function smartSelectPlayers(active) {
   const justPlayed = new Set(lastRound.courts.flatMap(c => [...c.team1, ...c.team2]));
   const rested = shuffle(active.filter(p => !justPlayed.has(p.name)));
   const played = shuffle(active.filter(p =>  justPlayed.has(p.name)));
-  const numCourts = Math.min(Math.floor(active.length / 4), state.maxCourts);
-  const numSlots  = numCourts * 4;
+  const numCourts = Math.min(Math.floor(active.length / perCourt()), state.maxCourts);
+  const numSlots  = numCourts * perCourt();
   const everyoneHasPlayed = active.every(p => p.courtsPlayed > 0);
   if (rested.length === numSlots && played.length > 0 && everyoneHasPlayed) {
     played.push(rested.pop());
@@ -804,7 +844,8 @@ function bestCourtAssignment(pairs) {
 }
 
 function formBalancedCourts(players) {
-  const pairs = formPairs(players);
+  // Singles: every "team" is one player; matching still minimises repeat opponents
+  const pairs = state.gameMode === 'singles' ? players.map(p => [p]) : formPairs(players);
   if (pairs.length < 2) return [];
   return bestCourtAssignment(pairs).courts;
 }
@@ -820,8 +861,8 @@ function generateRound(advance=true) {
     state.sittingOut = nextRoundCache.sittingOut;
   } else {
     const active = activePlayers();
-    const numCourts = Math.min(Math.floor(active.length/4), state.maxCourts);
-    const numPlaying = numCourts * 4;
+    const numCourts = Math.min(Math.floor(active.length/perCourt()), state.maxCourts);
+    const numPlaying = numCourts * perCourt();
     const prioritized = smartSelectPlayers(active);
     const toPlay = prioritized.slice(0, numPlaying);
     state.courts     = formBalancedCourts(toPlay);
@@ -862,7 +903,7 @@ function renderCourts() {
       <div class="vs-row">
         <div class="team">
           ${playerSlotHtml(i,'team1',0,c.team1[0],true)}
-          ${playerSlotHtml(i,'team1',1,c.team1[1],true)}
+          ${c.team1[1] ? playerSlotHtml(i,'team1',1,c.team1[1],true) : ''}
         </div>
         <div class="score-box">
           <input type="number" min="0" max="99" value="${c.score1}" placeholder="0"
@@ -873,7 +914,7 @@ function renderCourts() {
         </div>
         <div class="team">
           ${playerSlotHtml(i,'team2',0,c.team2[0],false)}
-          ${playerSlotHtml(i,'team2',1,c.team2[1],false)}
+          ${c.team2[1] ? playerSlotHtml(i,'team2',1,c.team2[1],false) : ''}
         </div>
       </div>
     </div>`).join('');
@@ -948,8 +989,8 @@ function reshufflePreview() {
 
 function computeNextRound() {
   const active = activePlayers();
-  const numCourts = Math.min(Math.floor(active.length/4), state.maxCourts);
-  const numPlaying = numCourts * 4;
+  const numCourts = Math.min(Math.floor(active.length/perCourt()), state.maxCourts);
+  const numPlaying = numCourts * perCourt();
 
   const srcCourts = state.courts.length ? state.courts
     : (state.history.length ? state.history[0].courts : []);
@@ -1041,9 +1082,8 @@ function recalcAll() {
       const maxScore=Math.max(s1,s2);
       c.team1.forEach(n => { const p=state.players.find(x=>x.name===n); if(p){p.score+=s1;p.rounds++;p.courtsPlayed++;p.maxPossible+=maxScore;if(t1won)p.wins++;} });
       c.team2.forEach(n => { const p=state.players.find(x=>x.name===n); if(p){p.score+=s2;p.rounds++;p.courtsPlayed++;p.maxPossible+=maxScore;if(t2won)p.wins++;} });
-      const k1=pairKey(c.team1[0],c.team1[1]), k2=pairKey(c.team2[0],c.team2[1]);
-      state.partnerHistory[k1]=(state.partnerHistory[k1]||0)+1;
-      state.partnerHistory[k2]=(state.partnerHistory[k2]||0)+1;
+      if (c.team1.length === 2) { const k1=pairKey(c.team1[0],c.team1[1]); state.partnerHistory[k1]=(state.partnerHistory[k1]||0)+1; }
+      if (c.team2.length === 2) { const k2=pairKey(c.team2[0],c.team2[1]); state.partnerHistory[k2]=(state.partnerHistory[k2]||0)+1; }
       c.team1.forEach(a => c.team2.forEach(b => {
         const ok=pairKey(a,b);
         state.opponentHistory[ok]=(state.opponentHistory[ok]||0)+1;
@@ -1186,12 +1226,12 @@ function roundEditCourtHtml(round, ci, c, prefix) {
       <div style="display:flex;align-items:center;gap:6px">
         <div style="flex:1;display:flex;flex-direction:column;gap:4px">
           ${sel(`${prefix}_${round}_${ci}_t1a`, c.team1[0])}
-          ${sel(`${prefix}_${round}_${ci}_t1b`, c.team1[1])}
+          ${state.gameMode === 'singles' ? '' : sel(`${prefix}_${round}_${ci}_t1b`, c.team1[1])}
         </div>
         <span style="font-size:11px;font-weight:700;color:#ccc">vs</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:4px">
           ${sel(`${prefix}_${round}_${ci}_t2a`, c.team2[0])}
-          ${sel(`${prefix}_${round}_${ci}_t2b`, c.team2[1])}
+          ${state.gameMode === 'singles' ? '' : sel(`${prefix}_${round}_${ci}_t2b`, c.team2[1])}
         </div>
       </div>
     </div>`;
@@ -1202,11 +1242,11 @@ function applyRoundEdit(round, prefix) {
   if (!h) return false;
   const picked = [];
   const newCourts = h.courts.map((c,ci) => {
-    const g = id => document.getElementById(`${prefix}_${round}_${ci}_${id}`);
-    const t1 = [g('t1a').value, g('t1b').value].filter(Boolean);
-    const t2 = [g('t2a').value, g('t2b').value].filter(Boolean);
+    const g = id => { const el = document.getElementById(`${prefix}_${round}_${ci}_${id}`); return el ? el.value : ''; };
+    const t1 = [g('t1a'), g('t1b')].filter(Boolean);
+    const t2 = [g('t2a'), g('t2b')].filter(Boolean);
     picked.push(...t1, ...t2);
-    return { team1:t1, team2:t2, score1:parseInt(g('1').value)||0, score2:parseInt(g('2').value)||0 };
+    return { team1:t1, team2:t2, score1:parseInt(g('1'))||0, score2:parseInt(g('2'))||0 };
   });
   if (new Set(picked).size !== picked.length) {
     alert('Same player selected more than once in this round.');
@@ -1360,7 +1400,7 @@ function finishSession() {
 
 function resetGame() {
   if (!confirm('Reset everything and start a new game?')) return;
-  state = { players:[], round:0, maxCourts:1, sessionName:'', bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, absentNext:new Set() };
+  state = { players:[], round:0, maxCourts:1, sessionName:'', gameMode:'doubles', bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, absentNext:new Set() };
   save(); location.reload();
 }
 
@@ -1516,7 +1556,7 @@ if (_playerViewCode) {
     document.getElementById('phase-badge').className = 'badge badge-setup';
     document.getElementById('view-summary').style.display = 'block';
     renderSummary();
-  } else if (state.round > 0 && state.players.length >= 4) {
+  } else if (state.round > 0 && state.players.length >= perCourt()) {
     setupCourts = state.maxCourts || 1;
     document.getElementById('view-setup').style.display = 'none';
     document.getElementById('view-game').style.display = 'block';
@@ -1524,7 +1564,7 @@ if (_playerViewCode) {
     document.getElementById('sticky-bar').style.display = 'block';
     document.getElementById('phase-badge').textContent = 'Round ' + state.round;
     document.getElementById('phase-badge').className = 'badge badge-round';
-    document.getElementById('game-session-name').textContent = state.sessionName || '';
+    document.getElementById('game-session-name').textContent = sessionLabel();
     updateShareUI();
     renderCourts(); renderAbsentToggles(); renderNextRoundPreview(); renderLeaderboard(); renderHistory();
   } else {

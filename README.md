@@ -14,7 +14,8 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 
 ## Features
 
-- **Smart shuffling** — players who sat out last round get priority; players who just played are deprioritized. Within each group, selection is random. Repeat partnerships and repeat opponents are minimised across rounds using match history.
+- **Doubles or Singles** — choose the game mode at setup: classic Americano doubles (2 vs 2, 4 players per court) or Singles (1 vs 1, 2 players per court). Everything — shuffling, standings, live sharing, history editing — works in both modes.
+- **Smart shuffling** — players who sat out last round get priority; players who just played are deprioritized. Within each group, selection is random. Repeat partnerships and repeat opponents are minimised across rounds using match history (in Singles, repeat opponents are minimised).
 - **Next round preview** — always visible below the courts, so players can prepare before the current round ends. Updates live when you mark absences, swap players, or add someone mid-session; tap **🔀 Shuffle** to redraw it. The preview is guaranteed accurate — what it shows is exactly what will be played.
 - **Flexible courts** — set 1 to 6 courts at the start; the app fills them optimally each round.
 - **Multiple sort modes** — view standings by **Points**, **Win %** (wins ÷ courts played), or **Pts %** (points scored ÷ maximum possible). Available in both the in-game Standings tab and the Summary screen.
@@ -31,17 +32,18 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 ## How to use
 
 1. Open the app on your phone
-2. Enter a session name and set how many courts are available
-3. Add all players
-4. Tap **Start game** — courts and partners are assigned automatically
-5. Enter scores after each match, tap **Save & next round**
-6. Use **Reshuffle** to re-draw courts before scores are entered (round number stays the same)
-7. Mark players who are stepping out under **Skip next round**
-8. Tap **＋ Player joining?** to add someone mid-session
-9. Use the **Points / Win % / Pts %** toggles to change how standings are sorted
-10. Tap **📡 Share live** in the round card to copy a link — send it to the group so everyone can follow along on their own phone
-11. When done, tap **End** → **Finish session** to see the summary and share results
-12. On the Summary screen, upload a background photo and use the **Reposition ↕** slider to frame the shot
+2. Pick a game mode — **👥 Doubles** (2 vs 2) or **👤 Singles** (1 vs 1)
+3. Enter a session name and set how many courts are available
+4. Add all players
+5. Tap **Start game** — courts and partners are assigned automatically
+6. Enter scores after each match, tap **Save & next round**
+7. Use **Reshuffle** to re-draw courts before scores are entered (round number stays the same)
+8. Mark players who are stepping out under **Skip next round**
+9. Tap **＋ Player joining?** to add someone mid-session
+10. Use the **Points / Win % / Pts %** toggles to change how standings are sorted
+11. Tap **📡 Share live** in the round card to copy a link — send it to the group so everyone can follow along on their own phone
+12. When done, tap **End** → **Finish session** to see the summary and share results
+13. On the Summary screen, upload a background photo and use the **Reposition ↕** slider to frame the shot
 
 ---
 
@@ -91,6 +93,13 @@ open index.html   # macOS
 ## Changelog
 
 ### v3.1 (July 2026)
+
+**Singles mode (1 vs 1)**
+- New **Game mode** choice on the setup screen: 👥 Doubles (2 vs 2) or 👤 Singles (1 vs 1)
+- Singles courts hold 2 players; sessions start from just 2 players
+- The shuffle engine minimises repeat opponents across rounds (partner logic doesn't apply)
+- Standings, sort modes, live sharing, round history, and the player editor all work identically in both modes
+- The round card shows a "• Singles" tag so you always know which mode the session is in
 
 **Fix the right player, get the right standings**
 - Round history editor now edits **players, not just scores** — tap **Edit** on any past round (Standings tab or Summary screen) and every court slot becomes a dropdown. Swap in who actually played, save, and points / played count / wins / Win % / Pts % all recalculate. The round's resting list auto-corrects too.
