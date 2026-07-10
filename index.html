@@ -95,6 +95,22 @@
   .round-banner { background: #d6f0e0; border: 0.5px solid #a7f3d0; border-radius: 12px; padding: 12px 16px; margin-bottom: 1rem; font-size: 14px; color: #166534; font-weight: 600; display: flex; align-items: center; gap: 10px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 
+  .gender-chip { border: none; border-radius: 20px; font-size: 12px; font-weight: 700; min-width: 40px; min-height: 30px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; }
+  .gender-chip.g-m { background: #e0f2fe; color: #0369a1; }
+  .gender-chip.g-f { background: #fce7f3; color: #be185d; }
+  .fem-mark { color: #db2777; font-size: 11px; font-weight: 700; }
+
+  .sched-round { padding: 10px 0; border-bottom: 0.5px dashed #e0e0dc; }
+  .sched-round:last-child { border-bottom: none; }
+  .sched-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+  .sched-label { font-size: 11px; font-weight: 700; color: #5b4fcf; text-transform: uppercase; letter-spacing: .06em; }
+  .sched-shuffle { background: none; border: none; font-size: 14px; cursor: pointer; padding: 4px 8px; border-radius: 8px; color: #5b4fcf; min-height: 30px; }
+  .sched-play { background: #f0effe; border: none; font-size: 12px; font-weight: 700; cursor: pointer; padding: 4px 12px; border-radius: 8px; color: #5b4fcf; min-height: 30px; }
+  .tag-parked { background: #fef3c7; color: #92400e; }
+  .sched-court { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+  .sched-team { flex: 1; }
+  .sched-rest { font-size: 12px; color: #bbb; margin-top: 2px; }
+
   .mode-toggle-row { display: flex; gap: 8px; }
   .mode-btn { flex: 1; border: 1.5px solid #e5e5e0; background: #fff; border-radius: 12px; padding: 12px 8px; font-size: 15px; font-weight: 600; color: #888; cursor: pointer; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
   .mode-btn.active { border-color: #5b4fcf; background: #f0effe; color: #5b4fcf; }
@@ -218,7 +234,7 @@
       </div>
     </div>
     <div id="start-error" style="color:#dc2626;font-size:14px;margin-bottom:.75rem;display:none"></div>
-    <button class="btn btn-primary btn-full" onclick="startGame()">Start game</button>
+    <button class="btn btn-primary btn-full" onclick="startGame()">Generate Matches</button>
     <div style="height:.5rem"></div>
   </div>
 
@@ -230,7 +246,7 @@
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div>
             <div style="font-size:11px;font-weight:700;color:#5b4fcf;text-transform:uppercase;letter-spacing:.06em">Round</div>
-            <div style="font-size:26px;font-weight:800;line-height:1.1" id="round-num">1</div>
+            <div style="font-size:26px;font-weight:800;line-height:1.1"><span id="round-num">1</span><span id="round-total" style="font-size:13px;font-weight:600;color:#bbb"></span></div>
           </div>
           <div style="text-align:center;font-size:13px;font-weight:600;color:#aaa;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="game-session-name"></div>
           <div style="text-align:right">
@@ -251,19 +267,19 @@
         <div id="sitting-out-list"></div>
       </div>
 
-      <div id="preview-section">
+      <div id="schedule-section">
         <div class="preview-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
-            <span style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.06em">Next round preview</span>
-            <button class="btn btn-secondary btn-sm" style="font-size:13px;color:#5b4fcf;min-height:34px;padding:5px 14px" onclick="reshufflePreview()">🔀 Shuffle</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.25rem">
+            <span style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.06em">Upcoming rounds</span>
           </div>
-          <div id="preview-content"></div>
-          <div style="font-size:11px;color:#bbb;margin-top:.5rem">Tentative — updates with absences, swaps &amp; new players</div>
+          <div id="schedule-content"></div>
+          <button class="btn btn-secondary btn-sm btn-full" style="font-size:13px;color:#5b4fcf;margin-top:.5rem" onclick="addScheduledRound()">＋ Add round</button>
+          <div style="font-size:11px;color:#bbb;margin-top:.5rem">Tentative — updates with absences, swaps &amp; new players. Tap 🔀 to redraw a round.</div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-title">Skip next round</div>
+        <div class="card-title">Skip upcoming rounds</div>
         <div id="absent-toggles"></div>
         <div style="margin-top:.75rem;padding-top:.75rem;border-top:0.5px solid #f0f0ec">
           <button class="btn btn-secondary btn-sm btn-full" style="font-size:14px" onclick="toggleQuickAdd()">＋ Player joining?</button>
@@ -423,7 +439,6 @@ let setupMode = 'doubles';
 let editingHistoryRound = null;
 let summaryEditingRound = null;
 let sortMode = 'points';
-let nextRoundCache = null;
 
 // Players per court: 4 in doubles, 2 in singles
 function perCourt() { return state.gameMode === 'singles' ? 2 : 4; }
@@ -440,6 +455,7 @@ let state = {
   maxCourts: 1,
   sessionName: '',
   gameMode: 'doubles',
+  schedule: [],
   bgPhoto: null,
   bgPhotoY: 35,
   sessionCode: null,
@@ -467,11 +483,12 @@ function load() {
       p.absentNext = new Set(p.absentNext || []);
       p.partnerHistory = p.partnerHistory || {};
       p.opponentHistory = p.opponentHistory || {};
-      (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; });
+      (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; pl.gender = pl.gender || 'M'; });
       if (p.bgPhotoY == null) p.bgPhotoY = 35;
       if (p.sessionCode == null) p.sessionCode = null;
       if (p.isFinished == null) p.isFinished = false;
       if (p.gameMode == null) p.gameMode = 'doubles';
+      if (!Array.isArray(p.schedule)) p.schedule = [];
       state = p;
     }
   } catch(e){}
@@ -718,6 +735,30 @@ function changeCourts(delta) {
 
 // ── SETUP ────────────────────────────────────────────────────────────────────
 
+function genderChipHtml(p) {
+  const isF = p.gender === 'F';
+  return `<button class="gender-chip ${isF?'g-f':'g-m'}" onclick="toggleGender('${p.name}')">${isF?'♀ F':'♂ M'}</button>`;
+}
+
+function toggleGender(name) {
+  const p = state.players.find(x=>x.name===name);
+  if (!p) return;
+  p.gender = p.gender === 'F' ? 'M' : 'F';
+  save();
+  if (state.round > 0) {
+    regenerateSchedule();
+    renderPlayerListGame();
+  } else {
+    renderSetup();
+  }
+}
+
+// Female names get a small ♀ so gender balance is visible on courts
+function nameHtml(name) {
+  const p = state.players.find(x=>x.name===name);
+  return p && p.gender === 'F' ? `${name} <span class="fem-mark">♀</span>` : name;
+}
+
 function renderSetup() {
   const list = document.getElementById('player-list-setup');
   if (!state.players.length) { list.innerHTML = '<div class="empty-state">No players yet</div>'; return; }
@@ -725,6 +766,7 @@ function renderSetup() {
     <div class="player-row">
       ${avatarHtml(p)}
       <div class="player-name">${p.name}</div>
+      ${genderChipHtml(p)}
       <button class="btn-icon" onclick="removePlayerSetup(${i})">✕</button>
     </div>`).join('');
 }
@@ -733,7 +775,7 @@ function addPlayer() {
   const inp = document.getElementById('new-player-input');
   const name = inp.value.trim();
   if (!name) return;
-  state.players.push({ name, score:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
+  state.players.push({ name, gender:'M', score:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
   inp.value = ''; inp.focus();
   renderSetup(); save();
 }
@@ -766,8 +808,10 @@ function startGame() {
   document.getElementById('phase-badge').className = 'badge badge-round';
   document.getElementById('game-session-name').textContent = sessionLabel();
   updateShareUI();
-  nextRoundCache = null;
+  state.schedule = [];
   generateRound();
+  regenerateSchedule(11); // round 1 + 11 upcoming = 12 planned rounds
+  save();
 }
 
 // ── SHUFFLE ALGORITHM ────────────────────────────────────────────────────────
@@ -783,8 +827,16 @@ function shuffle(arr) {
 }
 
 function pairKey(a, b) { return [a,b].sort().join('|'); }
-function getPartnerCount(a, b) { return state.partnerHistory[pairKey(a,b)] || 0; }
-function getOpponentCount(a, b) { return state.opponentHistory[pairKey(a,b)] || 0; }
+// During schedule simulation, simHist points at the simulated history instead of the real one
+let simHist = null;
+function getPartnerCount(a, b) { return (simHist ? simHist.partnerHistory : state.partnerHistory)[pairKey(a,b)] || 0; }
+function getOpponentCount(a, b) { return (simHist ? simHist.opponentHistory : state.opponentHistory)[pairKey(a,b)] || 0; }
+
+function teamGender(team) { // team: array of player objects → 'M' | 'F' | 'X' (mixed)
+  if (team.every(p => p.gender === 'F')) return 'F';
+  if (team.every(p => p.gender !== 'F')) return 'M';
+  return 'X';
+}
 
 function smartSelectPlayers(active) {
   if (!state.history.length) return shuffle(active);
@@ -822,6 +874,11 @@ function courtMatchScore(p1, p2) {
     score += getPartnerCount(a.name, b.name) * 3;
     score -= getOpponentCount(a.name, b.name) * 2;
   }));
+  // Doubles balance: an all-female pair never faces an all-male pair
+  if (p1.length === 2 && p2.length === 2) {
+    const g1 = teamGender(p1), g2 = teamGender(p2);
+    if (g1 !== 'X' && g2 !== 'X' && g1 !== g2) score -= 1000;
+  }
   return score;
 }
 
@@ -843,11 +900,31 @@ function bestCourtAssignment(pairs) {
   return best || { courts:[], score:0 };
 }
 
+function countGenderViolations(courts) {
+  const g = {}; state.players.forEach(p => g[p.name] = p.gender);
+  const tg = t => t.every(n=>g[n]==='F') ? 'F' : t.every(n=>g[n]!=='F') ? 'M' : 'X';
+  return courts.filter(c =>
+    c.team1.length===2 && c.team2.length===2 &&
+    tg(c.team1)!=='X' && tg(c.team2)!=='X' && tg(c.team1)!==tg(c.team2)
+  ).length;
+}
+
 function formBalancedCourts(players) {
   // Singles: every "team" is one player; matching still minimises repeat opponents
-  const pairs = state.gameMode === 'singles' ? players.map(p => [p]) : formPairs(players);
-  if (pairs.length < 2) return [];
-  return bestCourtAssignment(pairs).courts;
+  const singles = state.gameMode === 'singles';
+  let best = null, bestViol = Infinity;
+  let order = players;
+  const attempts = singles ? 1 : 24;
+  for (let i=0; i<attempts; i++) {
+    const pairs = singles ? order.map(p => [p]) : formPairs(order);
+    if (pairs.length < 2) return [];
+    const courts = bestCourtAssignment(pairs).courts;
+    const viol = countGenderViolations(courts);
+    if (viol < bestViol) { best = courts; bestViol = viol; }
+    if (bestViol === 0) break;
+    order = shuffle(players); // re-pair and retry until no women-pair-vs-men-pair court
+  }
+  return best;
 }
 
 function generateRound(advance=true) {
@@ -856,9 +933,10 @@ function generateRound(advance=true) {
   document.getElementById('round-num').textContent = state.round;
   document.getElementById('round-banner').style.display = 'none';
 
-  if (advance && nextRoundCache) {
-    state.courts     = nextRoundCache.courts;
-    state.sittingOut = nextRoundCache.sittingOut;
+  const next = advance ? state.schedule.shift() : null;
+  if (next && next.courts.length) {
+    state.courts     = next.courts;
+    state.sittingOut = next.sittingOut;
   } else {
     const active = activePlayers();
     const numCourts = Math.min(Math.floor(active.length/perCourt()), state.maxCourts);
@@ -867,8 +945,8 @@ function generateRound(advance=true) {
     const toPlay = prioritized.slice(0, numPlaying);
     state.courts     = formBalancedCourts(toPlay);
     state.sittingOut = prioritized.slice(numPlaying).map(p => p.name);
+    if (!advance) regenerateSchedule(); // reshuffled current round: upcoming rounds follow from it
   }
-  nextRoundCache = null;
 
   state.sittingOut.forEach(name => {
     const pl = state.players.find(x=>x.name===name);
@@ -877,7 +955,7 @@ function generateRound(advance=true) {
 
   renderCourts();
   renderAbsentToggles();
-  renderNextRoundPreview();
+  renderSchedule();
   save();
 }
 
@@ -890,7 +968,7 @@ function playerSlotHtml(courtIdx, team, playerIdx, name, alignRight=false) {
     ? `<button class="swap-btn" onclick="handleSwap(${courtIdx},'${team}',${playerIdx},this)">⇄</button>`
     : '';
   const isSecond = playerIdx === 1;
-  const nameSpan = `<span class="slot-name${isSecond?' slot-name-muted':''}" style="${alignRight?'text-align:right':'text-align:left'}">${name}</span>`;
+  const nameSpan = `<span class="slot-name${isSecond?' slot-name-muted':''}" style="${alignRight?'text-align:right':'text-align:left'}">${nameHtml(name)}</span>`;
   const inner = alignRight ? `${nameSpan}${swapBtn}` : `${swapBtn}${nameSpan}`;
   return `<div class="player-slot" style="${alignRight?'justify-content:flex-end':'justify-content:flex-start'}">${inner}</div>`;
 }
@@ -945,10 +1023,9 @@ function swapPlayer(courtIdx, team, playerIdx, newName) {
   if (!state.sittingOut.includes(oldName)) state.sittingOut.push(oldName);
   const p = state.players.find(x=>x.name===oldName);
   if (p) p.lastSatOutRound = state.round;
-  nextRoundCache = null;
+  regenerateSchedule();
   save();
   renderCourts();
-  renderNextRoundPreview();
 }
 
 let _pendingSwap = null;
@@ -980,49 +1057,153 @@ document.addEventListener('click', e => {
   }
 }, true);
 
-// ── PREVIEW ───────────────────────────────────────────────────────────────────
+// ── SCHEDULE (pre-generated upcoming rounds) ──────────────────────────────────
 
-function reshufflePreview() {
-  nextRoundCache = null;
-  renderNextRoundPreview();
+function makeSimCtx() {
+  const cp = {};
+  state.players.forEach(p => cp[p.name] = p.courtsPlayed);
+  const prevCourts = state.courts.length ? state.courts
+    : (state.history.length ? state.history[0].courts : []);
+  return {
+    partnerHistory: {...state.partnerHistory},
+    opponentHistory: {...state.opponentHistory},
+    courtsPlayed: cp,
+    prevCourts
+  };
 }
 
-function computeNextRound() {
+function simRegister(ctx, round) {
+  round.courts.forEach(c => {
+    if (c.team1.length === 2) { const k=pairKey(c.team1[0],c.team1[1]); ctx.partnerHistory[k]=(ctx.partnerHistory[k]||0)+1; }
+    if (c.team2.length === 2) { const k=pairKey(c.team2[0],c.team2[1]); ctx.partnerHistory[k]=(ctx.partnerHistory[k]||0)+1; }
+    c.team1.forEach(a => c.team2.forEach(b => { const k=pairKey(a,b); ctx.opponentHistory[k]=(ctx.opponentHistory[k]||0)+1; }));
+    [...c.team1, ...c.team2].forEach(n => ctx.courtsPlayed[n]=(ctx.courtsPlayed[n]||0)+1);
+  });
+  ctx.prevCourts = round.courts;
+}
+
+function computeRoundSim(ctx) {
   const active = activePlayers();
   const numCourts = Math.min(Math.floor(active.length/perCourt()), state.maxCourts);
   const numPlaying = numCourts * perCourt();
-
-  const srcCourts = state.courts.length ? state.courts
-    : (state.history.length ? state.history[0].courts : []);
-  const justPlayed = new Set(srcCourts.flatMap(c => [...(c.team1||[]), ...(c.team2||[])]));
+  const justPlayed = new Set((ctx.prevCourts||[]).flatMap(c => [...(c.team1||[]), ...(c.team2||[])]));
 
   const rested = shuffle(active.filter(p => !justPlayed.has(p.name)));
   const played  = shuffle(active.filter(p =>  justPlayed.has(p.name)));
-  const numSlots = numPlaying;
 
-  const everyoneHasPlayed = active.every(p => p.courtsPlayed > 0 || justPlayed.has(p.name));
-  if (rested.length === numSlots && played.length > 0 && everyoneHasPlayed) {
+  const everyoneHasPlayed = active.every(p => (ctx.courtsPlayed[p.name]||0) > 0 || justPlayed.has(p.name));
+  if (rested.length === numPlaying && played.length > 0 && everyoneHasPlayed) {
     played.push(rested.pop());
   }
 
   const prioritized = [...rested, ...played];
   const toPlay = prioritized.slice(0, numPlaying);
   const sitting = prioritized.slice(numPlaying);
-  nextRoundCache = { courts: formBalancedCourts(toPlay), sittingOut: sitting.map(p => p.name) };
-  return nextRoundCache;
+  return { courts: formBalancedCourts(toPlay), sittingOut: sitting.map(p => p.name) };
 }
 
-function renderNextRoundPreview() {
-  const { courts, sittingOut } = nextRoundCache || computeNextRound();
-  const el = document.getElementById('preview-content');
-  if (!courts.length) { el.innerHTML = '<div style="font-size:13px;color:#bbb">Not enough active players for a court.</div>'; return; }
-  el.innerHTML = courts.map((c,i) => `
-    <div class="preview-court">
-      <div class="preview-team">${c.team1.join(' & ')}</div>
-      <span class="preview-sep">vs</span>
-      <div class="preview-team" style="text-align:right">${c.team2.join(' & ')}</div>
-    </div>`).join('')
-    + (sittingOut.length ? `<div style="font-size:12px;color:#bbb;margin-top:6px">Resting: ${sittingOut.join(', ')}</div>` : '');
+function generateScheduleRounds(count, ctx) {
+  const rounds = [];
+  simHist = ctx;
+  try {
+    for (let i=0; i<count; i++) {
+      const r = computeRoundSim(ctx);
+      if (!r.courts || !r.courts.length) break;
+      rounds.push(r);
+      simRegister(ctx, r);
+    }
+  } finally { simHist = null; }
+  return rounds;
+}
+
+// Redraw the whole upcoming schedule from current reality (roster, absences, current courts)
+function regenerateSchedule(len) {
+  if (state.round === 0) return;
+  const n = len != null ? len : state.schedule.length;
+  state.schedule = n > 0 ? generateScheduleRounds(n, makeSimCtx()) : [];
+  renderSchedule();
+}
+
+function addScheduledRound() {
+  const ctx = makeSimCtx();
+  simHist = ctx;
+  try { state.schedule.forEach(r => simRegister(ctx, r)); } finally { simHist = null; }
+  state.schedule.push(...generateScheduleRounds(1, ctx));
+  renderSchedule();
+  save();
+}
+
+// Play an upcoming round now: it becomes the active round and the current
+// lineup (scores included) is parked in its slot — nothing else is redrawn
+function playScheduledRound(idx) {
+  const target = state.schedule[idx];
+  if (!target || !target.courts.length) return;
+  const parked = { courts: state.courts, sittingOut: state.sittingOut, parked: true };
+  state.courts = target.courts;
+  state.sittingOut = target.sittingOut;
+  state.schedule[idx] = parked;
+  state.sittingOut.forEach(name => {
+    const pl = state.players.find(x=>x.name===name);
+    if (pl) pl.lastSatOutRound = state.round;
+  });
+  renderCourts();
+  renderSchedule();
+  save();
+  document.getElementById('round-banner-text').textContent =
+    `Lineup swapped in — your previous lineup is parked at Round ${state.round + idx + 1}.`;
+  document.getElementById('round-banner').style.display = 'flex';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Redraw one upcoming round; rounds after it re-derive from the new draw.
+// Parked lineups elsewhere in the list are pinned in place, not redrawn.
+function shuffleScheduledRound(idx) {
+  const ctx = makeSimCtx();
+  simHist = ctx;
+  try {
+    state.schedule.slice(0, idx).forEach(r => simRegister(ctx, r));
+    const oldTail = state.schedule.slice(idx);
+    const tail = [];
+    for (let j = 0; j < oldTail.length; j++) {
+      const keep = oldTail[j].parked && j > 0; // j===0 is the round being shuffled on purpose
+      const r = keep ? oldTail[j] : computeRoundSim(ctx);
+      if (!r.courts || !r.courts.length) break;
+      tail.push(r);
+      simRegister(ctx, r);
+    }
+    state.schedule = [...state.schedule.slice(0, idx), ...tail];
+  } finally { simHist = null; }
+  renderSchedule();
+  save();
+}
+
+function renderSchedule() {
+  const el = document.getElementById('schedule-content');
+  const totalEl = document.getElementById('round-total');
+  if (totalEl) totalEl.textContent = state.schedule.length ? ` of ${state.round + state.schedule.length}` : '';
+  if (!state.schedule.length) {
+    el.innerHTML = '<div style="font-size:13px;color:#bbb;padding:4px 0">No upcoming rounds — add one below.</div>';
+    return;
+  }
+  el.innerHTML = state.schedule.map((r, i) => `
+    <div class="sched-round">
+      <div class="sched-head">
+        <span class="sched-label">Round ${state.round + i + 1}
+          ${r.parked ? '<span class="tag tag-parked" style="margin-left:6px">⏸ parked</span>' : ''}
+        </span>
+        <span style="display:flex;align-items:center;gap:2px">
+          <button class="sched-play" onclick="playScheduledRound(${i})">▶ Play</button>
+          <button class="sched-shuffle" onclick="shuffleScheduledRound(${i})">🔀</button>
+        </span>
+      </div>
+      ${r.courts.map(c => `
+        <div class="sched-court">
+          <div class="sched-team">${c.team1.map(nameHtml).join(' & ')}</div>
+          <span class="preview-sep">vs</span>
+          <div class="sched-team" style="text-align:right">${c.team2.map(nameHtml).join(' & ')}</div>
+        </div>`).join('')}
+      ${r.sittingOut.length ? `<div class="sched-rest">Resting: ${r.sittingOut.join(', ')}</div>` : ''}
+    </div>`).join('');
 }
 
 // ── ABSENCES & QUICK ADD ──────────────────────────────────────────────────────
@@ -1039,9 +1220,8 @@ function renderAbsentToggles() {
 
 function toggleAbsent(name, checked) {
   if (checked) state.absentNext.add(name); else state.absentNext.delete(name);
-  nextRoundCache = null;
+  regenerateSchedule();
   renderAbsentToggles();
-  renderNextRoundPreview();
   save();
 }
 
@@ -1057,12 +1237,11 @@ function quickAddPlayer() {
   const name = inp.value.trim();
   if (!name) return;
   if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
-  state.players.push({ name, score:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
+  state.players.push({ name, gender:'M', score:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
   inp.value = '';
   document.getElementById('quick-add-row').style.display = 'none';
-  nextRoundCache = null;
+  regenerateSchedule();
   renderAbsentToggles();
-  renderNextRoundPreview();
   renderLeaderboard();
   save();
   document.getElementById('round-banner-text').textContent = `${name} added — they'll join the next round.`;
@@ -1273,6 +1452,7 @@ function editHistoryRound(round) {
 function saveHistoryEdit(round) {
   if (!applyRoundEdit(round, 'he')) return;
   editingHistoryRound = null;
+  regenerateSchedule();
   renderLeaderboard();
   renderHistory();
 }
@@ -1342,10 +1522,10 @@ function addPlayerMidGame() {
   const name = inp.value.trim();
   if (!name) return;
   if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
-  state.players.push({ name, score:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
+  state.players.push({ name, gender:'M', score:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
   inp.value = '';
-  nextRoundCache = null;
-  renderPlayerListGame(); renderAbsentToggles(); renderNextRoundPreview(); renderLeaderboard(); save();
+  regenerateSchedule();
+  renderPlayerListGame(); renderAbsentToggles(); renderLeaderboard(); save();
 }
 
 function removePlayerGame(name) {
@@ -1357,8 +1537,8 @@ function removePlayerGame(name) {
     c.team2=c.team2.filter(n=>n!==name);
   });
   state.sittingOut = state.sittingOut.filter(n=>n!==name);
-  nextRoundCache = null;
-  renderPlayerListGame(); renderCourts(); renderAbsentToggles(); renderNextRoundPreview(); renderLeaderboard(); save();
+  regenerateSchedule();
+  renderPlayerListGame(); renderCourts(); renderAbsentToggles(); renderLeaderboard(); save();
 }
 
 function renderPlayerListGame() {
@@ -1367,6 +1547,7 @@ function renderPlayerListGame() {
     <div class="player-row">
       ${avatarHtml(p)}
       <div class="player-name">${p.name}</div>
+      ${genderChipHtml(p)}
       <span class="player-score">${p.score} pts</span>
       <button class="btn-icon" onclick="removePlayerGame('${p.name}')">✕</button>
     </div>`).join('');
@@ -1400,7 +1581,7 @@ function finishSession() {
 
 function resetGame() {
   if (!confirm('Reset everything and start a new game?')) return;
-  state = { players:[], round:0, maxCourts:1, sessionName:'', gameMode:'doubles', bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, absentNext:new Set() };
+  state = { players:[], round:0, maxCourts:1, sessionName:'', gameMode:'doubles', schedule:[], bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, absentNext:new Set() };
   save(); location.reload();
 }
 
@@ -1564,9 +1745,11 @@ if (_playerViewCode) {
     document.getElementById('sticky-bar').style.display = 'block';
     document.getElementById('phase-badge').textContent = 'Round ' + state.round;
     document.getElementById('phase-badge').className = 'badge badge-round';
+    document.getElementById('round-num').textContent = state.round;
     document.getElementById('game-session-name').textContent = sessionLabel();
     updateShareUI();
-    renderCourts(); renderAbsentToggles(); renderNextRoundPreview(); renderLeaderboard(); renderHistory();
+    if (!state.schedule.length) state.schedule = generateScheduleRounds(Math.max(12 - state.round, 0), makeSimCtx());
+    renderCourts(); renderAbsentToggles(); renderSchedule(); renderLeaderboard(); renderHistory();
   } else {
     document.getElementById('courts-count-display').textContent = setupCourts;
     renderSetup();

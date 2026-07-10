@@ -16,7 +16,9 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 
 - **Doubles or Singles** — choose the game mode at setup: classic Americano doubles (2 vs 2, 4 players per court) or Singles (1 vs 1, 2 players per court). Everything — shuffling, standings, live sharing, history editing — works in both modes.
 - **Smart shuffling** — players who sat out last round get priority; players who just played are deprioritized. Within each group, selection is random. Repeat partnerships and repeat opponents are minimised across rounds using match history (in Singles, repeat opponents are minimised).
-- **Next round preview** — always visible below the courts, so players can prepare before the current round ends. Updates live when you mark absences, swap players, or add someone mid-session; tap **🔀 Shuffle** to redraw it. The preview is guaranteed accurate — what it shows is exactly what will be played.
+- **Full 12-round schedule** — "Generate Matches" creates round 1 plus 11 upcoming rounds you can scroll through, so everyone knows what's coming. Each upcoming round has its own 🔀 redraw button, **＋ Add round** extends the plan past 12, and the whole schedule updates live when you mark absences, swap players, or add someone mid-session. The schedule is guaranteed accurate — the round you play is exactly the one shown.
+- **Play rounds in any order** — tap **▶ Play** on any upcoming round to play it now (e.g. someone stepped out and a later round fits who's on court). Your current lineup is parked in that round's slot — marked **⏸ parked** — with any typed scores kept, waiting until you come back to it. Nothing else is reshuffled.
+- **Gender-balanced doubles** — mark players ♂/♀ with one tap on the player list. In doubles, an all-female pair is never matched against an all-male pair; mixed pairings are unrestricted. Female players get a small ♀ mark on court cards so balance is visible at a glance.
 - **Flexible courts** — set 1 to 6 courts at the start; the app fills them optimally each round.
 - **Multiple sort modes** — view standings by **Points**, **Win %** (wins ÷ courts played), or **Pts %** (points scored ÷ maximum possible). Available in both the in-game Standings tab and the Summary screen.
 - **Live standings** — leaderboard updates after every round, with full round-by-round history.
@@ -34,12 +36,13 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 1. Open the app on your phone
 2. Pick a game mode — **👥 Doubles** (2 vs 2) or **👤 Singles** (1 vs 1)
 3. Enter a session name and set how many courts are available
-4. Add all players
-5. Tap **Start game** — courts and partners are assigned automatically
+4. Add all players, and tap the ♂/♀ chip to mark each player's gender
+5. Tap **Generate Matches** — round 1 starts and a full 12-round schedule appears below the courts
 6. Enter scores after each match, tap **Save & next round**
-7. Use **Reshuffle** to re-draw courts before scores are entered (round number stays the same)
-8. Mark players who are stepping out under **Skip next round**
-9. Tap **＋ Player joining?** to add someone mid-session
+7. Use **Reshuffle** to re-draw the current round before scores are entered, or 🔀 on any upcoming round to redraw it
+   — or tap **▶ Play** on an upcoming round to play it right now; your current lineup parks in its place until you return to it
+8. Mark players who are stepping out under **Skip upcoming rounds** — the schedule adjusts instantly
+9. Tap **＋ Player joining?** to add someone mid-session, or **＋ Add round** to extend the schedule past 12
 10. Use the **Points / Win % / Pts %** toggles to change how standings are sorted
 11. Tap **📡 Share live** in the round card to copy a link — send it to the group so everyone can follow along on their own phone
 12. When done, tap **End** → **Finish session** to see the summary and share results
@@ -93,6 +96,20 @@ open index.html   # macOS
 ## Changelog
 
 ### v3.1 (July 2026)
+
+**Full 12-round schedule**
+- "Start game" is now **Generate Matches**: round 1 plus 11 upcoming rounds are drawn immediately, listed below the courts so players can see what's coming and prepare
+- Each upcoming round has a 🔀 button to redraw it (rounds after it re-derive automatically); **＋ Add round** extends the plan beyond 12
+- "Save & next round" works exactly as before — it plays the schedule in order
+- The schedule regenerates automatically when you mark absences, add/remove players, swap someone into the current round, or retro-edit a past round
+- Round card now shows "Round X of Y"
+- The "Skip next round" card is now **Skip upcoming rounds** — checked players are excluded from the whole schedule until unchecked
+- **▶ Play any round next**: tap ▶ Play on an upcoming round to make it the active round — the current lineup (typed scores included) is parked in its slot with a ⏸ tag until you play it later; nothing else is redrawn. Per-round 🔀 keeps parked lineups pinned in place.
+
+**Gender & balanced doubles**
+- Every player has a ♂/♀ chip (setup screen and Players tab) — tap to toggle; new players default to ♂
+- In doubles, the matchmaker never pits an all-female pair against an all-male pair (mixed pairs are unrestricted); if a draw would force it, pairings are redrawn
+- Female players show a small ♀ next to their name on court cards and in the schedule
 
 **Singles mode (1 vs 1)**
 - New **Game mode** choice on the setup screen: 👥 Doubles (2 vs 2) or 👤 Singles (1 vs 1)
