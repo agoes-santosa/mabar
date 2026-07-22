@@ -15,12 +15,12 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 ## Features
 
 - **Doubles or Singles** — choose the game mode at setup: classic Americano doubles (2 vs 2, 4 players per court) or Singles (1 vs 1, 2 players per court). Everything — shuffling, standings, live sharing, history editing — works in both modes.
-- **Smart shuffling** — players who sat out last round get priority; players who just played are deprioritized. Within each group, selection is random. Repeat partnerships and repeat opponents are minimised across rounds using match history (in Singles, repeat opponents are minimised).
+- **Smart shuffling** — players who sat out last round get priority; players who just played are deprioritized. Within each group, selection is random. Repeat partnerships and repeat opponents are minimised across rounds using match history (in Singles, repeat opponents are minimised). For sessions up to 3 courts, partner pairings are chosen by checking every possible pairing for the round and picking the one with the fewest repeats, rather than a faster but less thorough one-pair-at-a-time guess.
 - **Full 12-round schedule** — "Generate Matches" creates round 1 plus 11 upcoming rounds you can scroll through, so everyone knows what's coming. Each upcoming round has its own 🔀 redraw button, **＋ Add round** extends the plan past 12, and the whole schedule updates live when you mark absences, swap players, or add someone mid-session. The schedule is guaranteed accurate — the round you play is exactly the one shown.
 - **Play rounds in any order** — tap **▶ Play** on any upcoming round to play it now (e.g. someone stepped out and a later round fits who's on court). Your current lineup is parked in that round's slot — marked **⏸ parked** — with any typed scores kept, waiting until you come back to it. Nothing else is reshuffled.
 - **Gender-balanced doubles** — mark players ♂/♀ with one tap on the player list. In doubles, an all-female pair is never matched against an all-male pair; mixed pairings are unrestricted. Female players get a small ♀ mark on court cards so balance is visible at a glance.
 - **Flexible courts** — set 1 to 6 courts at the start; the app fills them optimally each round.
-- **Multiple sort modes** — view standings by **Points**, **Win %** (wins ÷ courts played), or **Pts %** (points scored ÷ maximum possible). Available in both the in-game Standings tab and the Summary screen.
+- **Multiple sort modes** — view standings by **Points**, **Win %** (wins ÷ courts played), or **Pts %** (points scored ÷ maximum possible). Available in both the in-game Standings tab and the Summary screen. Exact ties (same points, same win rate, same pts%) are broken automatically by point differential — total games won minus games lost across the session.
 - **Live standings** — leaderboard updates after every round, with full round-by-round history.
 - **Score & player editing** — correct any score, or even *who actually played*, in any past round — mid-session or from the Summary screen; all stats recalculate automatically.
 - **Player management** — mark absences before a round, swap players between courts and the sitting-out bench, or add players mid-session.
@@ -96,6 +96,11 @@ open index.html   # macOS
 ## Changelog
 
 ### v3.1 (July 2026)
+
+**Fairer standings & pairings**
+- Standings ties (identical Points, Win%, *and* Pts% — which can genuinely happen) are now broken automatically by point differential: total games won minus games lost across the session. It only ever adjudicates players who are perfectly tied on the primary metric already — it never changes a ranking that wasn't already tied, so a 4-3 win still counts exactly the same as a 4-0 win everywhere else.
+- If differential is *also* tied, standings fall back to alphabetical instead of the old arbitrary "whoever was added to the roster first"
+- Partner pairing now searches every possible pairing for the round (up to 3 courts) and picks the one with fewest repeat partnerships, instead of a faster greedy guess that could lock in a worse pairing without realizing it
 
 **Full 12-round schedule**
 - "Start game" is now **Generate Matches**: round 1 plus 11 upcoming rounds are drawn immediately, listed below the courts so players can see what's coming and prepare

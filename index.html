@@ -483,13 +483,16 @@ function load() {
       p.absentNext = new Set(p.absentNext || []);
       p.partnerHistory = p.partnerHistory || {};
       p.opponentHistory = p.opponentHistory || {};
-      (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; pl.gender = pl.gender || 'M'; });
+      const needsRecalc = (p.players || []).some(pl => pl.pointsAgainst == null);
+      (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; pl.gender = pl.gender || 'M'; pl.pointsAgainst = pl.pointsAgainst || 0; });
       if (p.bgPhotoY == null) p.bgPhotoY = 35;
       if (p.sessionCode == null) p.sessionCode = null;
       if (p.isFinished == null) p.isFinished = false;
       if (p.gameMode == null) p.gameMode = 'doubles';
       if (!Array.isArray(p.schedule)) p.schedule = [];
       state = p;
+      // Backfill pointsAgainst accurately from history for sessions saved before this field existed
+      if (needsRecalc) recalcAll();
     }
   } catch(e){}
 }
@@ -775,7 +778,7 @@ function addPlayer() {
   const inp = document.getElementById('new-player-input');
   const name = inp.value.trim();
   if (!name) return;
-  state.players.push({ name, gender:'M', score:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
+  state.players.push({ name, gender:'M', score:0, pointsAgainst:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
   inp.value = ''; inp.focus();
   renderSetup(); save();
 }
@@ -853,7 +856,7 @@ function smartSelectPlayers(active) {
   return [...rested, ...played];
 }
 
-function formPairs(players) {
+function formPairsGreedy(players) {
   const remaining = [...players];
   const pairs = [];
   while (remaining.length >= 2) {
@@ -866,6 +869,35 @@ function formPairs(players) {
     pairs.push([first, remaining.splice(bestIdx,1)[0]]);
   }
   return pairs;
+}
+
+// Tries every possible way to split players into partner-pairs and keeps the one
+// with the fewest total repeat partnerships (branch-and-bound over perfect matchings).
+// Greedy nearest-neighbor picks one pair at a time and can lock in a locally-fine
+// choice that forces a worse pairing later — this checks all of them.
+function formPairsExhaustive(players) {
+  let best = null, bestScore = Infinity;
+  function recurse(remaining, pairs, scoreSoFar) {
+    if (scoreSoFar >= bestScore) return; // prune: can't beat the best found so far
+    if (remaining.length === 0) { best = pairs.slice(); bestScore = scoreSoFar; return; }
+    const first = remaining[0];
+    const rest = remaining.slice(1);
+    for (let i=0; i<rest.length; i++) {
+      const partner = rest[i];
+      const cost = getPartnerCount(first.name, partner.name);
+      pairs.push([first, partner]);
+      recurse(rest.slice(0,i).concat(rest.slice(i+1)), pairs, scoreSoFar + cost);
+      pairs.pop();
+    }
+  }
+  recurse(players, [], 0);
+  return best || [];
+}
+
+// Up to 3 courts (12 players => 10395 possible pairings) the exhaustive search is
+// near-instant; beyond that it explodes combinatorially, so fall back to greedy.
+function formPairs(players) {
+  return players.length <= 12 ? formPairsExhaustive(players) : formPairsGreedy(players);
 }
 
 function courtMatchScore(p1, p2) {
@@ -1237,7 +1269,7 @@ function quickAddPlayer() {
   const name = inp.value.trim();
   if (!name) return;
   if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
-  state.players.push({ name, gender:'M', score:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
+  state.players.push({ name, gender:'M', score:0, pointsAgainst:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
   inp.value = '';
   document.getElementById('quick-add-row').style.display = 'none';
   regenerateSchedule();
@@ -1251,7 +1283,7 @@ function quickAddPlayer() {
 // ── SCORE SUBMISSION ──────────────────────────────────────────────────────────
 
 function recalcAll() {
-  state.players.forEach(p => { p.score=0; p.rounds=0; p.courtsPlayed=0; p.lastSatOutRound=0; p.wins=0; p.maxPossible=0; });
+  state.players.forEach(p => { p.score=0; p.rounds=0; p.courtsPlayed=0; p.lastSatOutRound=0; p.wins=0; p.maxPossible=0; p.pointsAgainst=0; });
   state.partnerHistory = {};
   state.opponentHistory = {};
   [...state.history].reverse().forEach(h => {
@@ -1259,8 +1291,8 @@ function recalcAll() {
       const s1=c.score1||0, s2=c.score2||0;
       const t1won=s1>s2, t2won=s2>s1;
       const maxScore=Math.max(s1,s2);
-      c.team1.forEach(n => { const p=state.players.find(x=>x.name===n); if(p){p.score+=s1;p.rounds++;p.courtsPlayed++;p.maxPossible+=maxScore;if(t1won)p.wins++;} });
-      c.team2.forEach(n => { const p=state.players.find(x=>x.name===n); if(p){p.score+=s2;p.rounds++;p.courtsPlayed++;p.maxPossible+=maxScore;if(t2won)p.wins++;} });
+      c.team1.forEach(n => { const p=state.players.find(x=>x.name===n); if(p){p.score+=s1;p.pointsAgainst+=s2;p.rounds++;p.courtsPlayed++;p.maxPossible+=maxScore;if(t1won)p.wins++;} });
+      c.team2.forEach(n => { const p=state.players.find(x=>x.name===n); if(p){p.score+=s2;p.pointsAgainst+=s1;p.rounds++;p.courtsPlayed++;p.maxPossible+=maxScore;if(t2won)p.wins++;} });
       if (c.team1.length === 2) { const k1=pairKey(c.team1[0],c.team1[1]); state.partnerHistory[k1]=(state.partnerHistory[k1]||0)+1; }
       if (c.team2.length === 2) { const k2=pairKey(c.team2[0],c.team2[1]); state.partnerHistory[k2]=(state.partnerHistory[k2]||0)+1; }
       c.team1.forEach(a => c.team2.forEach(b => {
@@ -1310,22 +1342,26 @@ function pointPct(p) {
   return Math.round(p.score / p.maxPossible * 100) + '%';
 }
 
+// Point differential (games won minus games lost, across all matches) — used only
+// to break exact ties on Points/Win%/Pts%; never overrides those primary metrics.
+function diffOf(p) { return (p.score||0) - (p.pointsAgainst||0); }
+
 function getSortedPlayers() {
   if (sortMode === 'winrate') {
     return [...state.players].sort((a,b) => {
       const ra = a.courtsPlayed ? (a.wins||0)/a.courtsPlayed : 0;
       const rb = b.courtsPlayed ? (b.wins||0)/b.courtsPlayed : 0;
-      return rb - ra || b.score - a.score;
+      return rb - ra || b.score - a.score || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name);
     });
   }
   if (sortMode === 'ptspct') {
     return [...state.players].sort((a,b) => {
       const ra = a.maxPossible ? a.score/a.maxPossible : 0;
       const rb = b.maxPossible ? b.score/b.maxPossible : 0;
-      return rb - ra || b.score - a.score;
+      return rb - ra || b.score - a.score || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name);
     });
   }
-  return [...state.players].sort((a,b) => b.score - a.score);
+  return [...state.players].sort((a,b) => b.score - a.score || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name));
 }
 
 function setSortMode(mode) {
@@ -1522,7 +1558,7 @@ function addPlayerMidGame() {
   const name = inp.value.trim();
   if (!name) return;
   if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
-  state.players.push({ name, gender:'M', score:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
+  state.players.push({ name, gender:'M', score:0, pointsAgainst:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
   inp.value = '';
   regenerateSchedule();
   renderPlayerListGame(); renderAbsentToggles(); renderLeaderboard(); save();
