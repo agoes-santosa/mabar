@@ -300,9 +300,10 @@
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
           <span class="card-title" style="margin-bottom:0">Standings</span>
           <div class="sort-toggle-row">
-            <button class="sort-btn active" id="sort-pts-btn" onclick="setSortMode('points')">Points</button>
+            <button class="sort-btn active" id="sort-pts-btn" onclick="setSortMode('points')">Raw Pts</button>
             <button class="sort-btn" id="sort-wr-btn" onclick="setSortMode('winrate')">Win %</button>
             <button class="sort-btn" id="sort-pp-btn" onclick="setSortMode('ptspct')">Pts %</button>
+            <button class="sort-btn" id="sort-mp-btn" onclick="setSortMode('matchpts')">Match Pts</button>
           </div>
         </div>
         <div id="leaderboard-list"></div>
@@ -352,9 +353,10 @@
       </div>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:4px;margin-bottom:.75rem">
-      <button class="sort-btn active" id="sum-sort-pts-btn" onclick="setSortMode('points')">Points</button>
+      <button class="sort-btn active" id="sum-sort-pts-btn" onclick="setSortMode('points')">Raw Pts</button>
       <button class="sort-btn" id="sum-sort-wr-btn" onclick="setSortMode('winrate')">Win %</button>
       <button class="sort-btn" id="sum-sort-pp-btn" onclick="setSortMode('ptspct')">Pts %</button>
+      <button class="sort-btn" id="sum-sort-mp-btn" onclick="setSortMode('matchpts')">Match Pts</button>
     </div>
     <div class="card" style="margin-bottom:.875rem">
       <div class="card-title">Background photo</div>
@@ -483,15 +485,15 @@ function load() {
       p.absentNext = new Set(p.absentNext || []);
       p.partnerHistory = p.partnerHistory || {};
       p.opponentHistory = p.opponentHistory || {};
-      const needsRecalc = (p.players || []).some(pl => pl.pointsAgainst == null);
-      (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; pl.gender = pl.gender || 'M'; pl.pointsAgainst = pl.pointsAgainst || 0; });
+      const needsRecalc = (p.players || []).some(pl => pl.pointsAgainst == null || pl.matchPts == null);
+      (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; pl.gender = pl.gender || 'M'; pl.pointsAgainst = pl.pointsAgainst || 0; pl.matchPts = pl.matchPts || 0; });
       if (p.bgPhotoY == null) p.bgPhotoY = 35;
       if (p.sessionCode == null) p.sessionCode = null;
       if (p.isFinished == null) p.isFinished = false;
       if (p.gameMode == null) p.gameMode = 'doubles';
       if (!Array.isArray(p.schedule)) p.schedule = [];
       state = p;
-      // Backfill pointsAgainst accurately from history for sessions saved before this field existed
+      // Backfill pointsAgainst/matchPts accurately from history for sessions saved before those fields existed
       if (needsRecalc) recalcAll();
     }
   } catch(e){}
@@ -778,7 +780,7 @@ function addPlayer() {
   const inp = document.getElementById('new-player-input');
   const name = inp.value.trim();
   if (!name) return;
-  state.players.push({ name, gender:'M', score:0, pointsAgainst:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
+  state.players.push({ name, gender:'M', score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
   inp.value = ''; inp.focus();
   renderSetup(); save();
 }
@@ -1269,7 +1271,7 @@ function quickAddPlayer() {
   const name = inp.value.trim();
   if (!name) return;
   if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
-  state.players.push({ name, gender:'M', score:0, pointsAgainst:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
+  state.players.push({ name, gender:'M', score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
   inp.value = '';
   document.getElementById('quick-add-row').style.display = 'none';
   regenerateSchedule();
@@ -1282,17 +1284,23 @@ function quickAddPlayer() {
 
 // ── SCORE SUBMISSION ──────────────────────────────────────────────────────────
 
+// Match Pts weights: win worth 2x a loss. Tie sits at the midpoint (ties are rare/never
+// happen with this app's scoring, but every match must resolve to some value).
+const MATCH_PTS_WIN = 2, MATCH_PTS_LOSE = 1, MATCH_PTS_TIE = 1.5;
+
 function recalcAll() {
-  state.players.forEach(p => { p.score=0; p.rounds=0; p.courtsPlayed=0; p.lastSatOutRound=0; p.wins=0; p.maxPossible=0; p.pointsAgainst=0; });
+  state.players.forEach(p => { p.score=0; p.rounds=0; p.courtsPlayed=0; p.lastSatOutRound=0; p.wins=0; p.maxPossible=0; p.pointsAgainst=0; p.matchPts=0; });
   state.partnerHistory = {};
   state.opponentHistory = {};
   [...state.history].reverse().forEach(h => {
     h.courts.forEach(c => {
       const s1=c.score1||0, s2=c.score2||0;
-      const t1won=s1>s2, t2won=s2>s1;
+      const t1won=s1>s2, t2won=s2>s1, tie=s1===s2;
       const maxScore=Math.max(s1,s2);
-      c.team1.forEach(n => { const p=state.players.find(x=>x.name===n); if(p){p.score+=s1;p.pointsAgainst+=s2;p.rounds++;p.courtsPlayed++;p.maxPossible+=maxScore;if(t1won)p.wins++;} });
-      c.team2.forEach(n => { const p=state.players.find(x=>x.name===n); if(p){p.score+=s2;p.pointsAgainst+=s1;p.rounds++;p.courtsPlayed++;p.maxPossible+=maxScore;if(t2won)p.wins++;} });
+      const mp1 = t1won?MATCH_PTS_WIN:tie?MATCH_PTS_TIE:MATCH_PTS_LOSE;
+      const mp2 = t2won?MATCH_PTS_WIN:tie?MATCH_PTS_TIE:MATCH_PTS_LOSE;
+      c.team1.forEach(n => { const p=state.players.find(x=>x.name===n); if(p){p.score+=s1;p.pointsAgainst+=s2;p.rounds++;p.courtsPlayed++;p.maxPossible+=maxScore;p.matchPts+=mp1;if(t1won)p.wins++;} });
+      c.team2.forEach(n => { const p=state.players.find(x=>x.name===n); if(p){p.score+=s2;p.pointsAgainst+=s1;p.rounds++;p.courtsPlayed++;p.maxPossible+=maxScore;p.matchPts+=mp2;if(t2won)p.wins++;} });
       if (c.team1.length === 2) { const k1=pairKey(c.team1[0],c.team1[1]); state.partnerHistory[k1]=(state.partnerHistory[k1]||0)+1; }
       if (c.team2.length === 2) { const k2=pairKey(c.team2[0],c.team2[1]); state.partnerHistory[k2]=(state.partnerHistory[k2]||0)+1; }
       c.team1.forEach(a => c.team2.forEach(b => {
@@ -1346,22 +1354,52 @@ function pointPct(p) {
 // to break exact ties on Points/Win%/Pts%; never overrides those primary metrics.
 function diffOf(p) { return (p.score||0) - (p.pointsAgainst||0); }
 
+// Median rounds played among players who've played at least once. Used to gate
+// Win%/Pts% ranking so a small sample (e.g. 1-for-1) can't outrank a proven record.
+function medianPlayed() {
+  const counts = state.players.filter(p => p.courtsPlayed > 0).map(p => p.courtsPlayed).sort((a,b) => a-b);
+  if (!counts.length) return 0;
+  const mid = Math.floor(counts.length / 2);
+  return counts.length % 2 ? counts[mid] : (counts[mid-1] + counts[mid]) / 2;
+}
+
+// Ranks players who've played at least the median number of rounds first (sorted
+// by cmp among themselves), then everyone below that bar after (also sorted by cmp).
+// Guarantees the podium never highlights a small, lucky sample over a proven one,
+// while still showing every player with their real stats.
+function sortWithQualification(cmp) {
+  const median = medianPlayed();
+  const qualified = state.players.filter(p => p.courtsPlayed >= median);
+  const rest = state.players.filter(p => p.courtsPlayed < median);
+  return [...qualified.sort(cmp), ...rest.sort(cmp)];
+}
+
 function getSortedPlayers() {
   if (sortMode === 'winrate') {
-    return [...state.players].sort((a,b) => {
+    return sortWithQualification((a,b) => {
       const ra = a.courtsPlayed ? (a.wins||0)/a.courtsPlayed : 0;
       const rb = b.courtsPlayed ? (b.wins||0)/b.courtsPlayed : 0;
       return rb - ra || b.score - a.score || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name);
     });
   }
   if (sortMode === 'ptspct') {
-    return [...state.players].sort((a,b) => {
+    return sortWithQualification((a,b) => {
       const ra = a.maxPossible ? a.score/a.maxPossible : 0;
       const rb = b.maxPossible ? b.score/b.maxPossible : 0;
       return rb - ra || b.score - a.score || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name);
     });
   }
+  if (sortMode === 'matchpts') {
+    // No qualification bar here: Match Pts is a total (like Raw Pts), not a rate, so it's
+    // already volume-weighted and doesn't let a small sample rank ahead of a proven one.
+    return [...state.players].sort((a,b) => (b.matchPts||0) - (a.matchPts||0) || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name));
+  }
   return [...state.players].sort((a,b) => b.score - a.score || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name));
+}
+
+function matchPtsDisplay(p) {
+  const v = p.matchPts||0;
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
 function setSortMode(mode) {
@@ -1369,9 +1407,11 @@ function setSortMode(mode) {
   document.getElementById('sort-pts-btn')?.classList.toggle('active', mode==='points');
   document.getElementById('sort-wr-btn')?.classList.toggle('active', mode==='winrate');
   document.getElementById('sort-pp-btn')?.classList.toggle('active', mode==='ptspct');
+  document.getElementById('sort-mp-btn')?.classList.toggle('active', mode==='matchpts');
   document.getElementById('sum-sort-pts-btn')?.classList.toggle('active', mode==='points');
   document.getElementById('sum-sort-wr-btn')?.classList.toggle('active', mode==='winrate');
   document.getElementById('sum-sort-pp-btn')?.classList.toggle('active', mode==='ptspct');
+  document.getElementById('sum-sort-mp-btn')?.classList.toggle('active', mode==='matchpts');
   if (document.getElementById('standings-view').style.display !== 'none') renderLeaderboard();
   if (document.getElementById('view-summary').style.display !== 'none') renderSummaryBoard();
   cachedCanvas = null;
@@ -1383,7 +1423,7 @@ function renderLeaderboard() {
   if (!sorted.length) { list.innerHTML='<div class="empty-state">No scores yet</div>'; return; }
   list.innerHTML = sorted.map((p,i) => {
     const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank';
-    const metric = sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : p.score;
+    const metric = sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : sortMode==='matchpts' ? matchPtsDisplay(p) : p.score;
     return `<div class="leaderboard-row">
       <span class="rank ${rc}">${i+1}</span>
       ${avatarHtml(p,32,12)}
@@ -1558,7 +1598,7 @@ function addPlayerMidGame() {
   const name = inp.value.trim();
   if (!name) return;
   if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
-  state.players.push({ name, gender:'M', score:0, pointsAgainst:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
+  state.players.push({ name, gender:'M', score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
   inp.value = '';
   regenerateSchedule();
   renderPlayerListGame(); renderAbsentToggles(); renderLeaderboard(); save();
@@ -1633,7 +1673,7 @@ function renderSummaryBoard() {
     `<div class="podium-slot">
       <div class="podium-avatar ${avCls[i]}">${initials(p.name)}</div>
       <div class="podium-name">${p.name}</div>
-      <div class="podium-pts">${sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : p.score+' pts'}</div>
+      <div class="podium-pts">${sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : sortMode==='matchpts' ? matchPtsDisplay(p)+' pts' : p.score+' pts'}</div>
       <div class="podium-pts">${p.courtsPlayed||0} played</div>
       <div class="podium-block ${blCls[i]}">${podiumMedals[i]}</div>
     </div>`).join('');
@@ -1644,7 +1684,7 @@ function renderSummaryBoard() {
       <div class="sum-avatar">${initials(p.name)}</div>
       <span style="flex:1;font-size:14px">${p.name}</span>
       <span style="font-size:12px;color:#aaa;margin-right:8px">${p.courtsPlayed||0} played</span>
-      <span style="font-size:15px;font-weight:700">${sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : p.score}</span>
+      <span style="font-size:15px;font-weight:700">${sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : sortMode==='matchpts' ? matchPtsDisplay(p) : p.score}</span>
     </div>`).join('');
 }
 
