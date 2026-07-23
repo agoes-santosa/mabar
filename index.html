@@ -873,35 +873,6 @@ function formPairsGreedy(players) {
   return pairs;
 }
 
-// Tries every possible way to split players into partner-pairs and keeps the one
-// with the fewest total repeat partnerships (branch-and-bound over perfect matchings).
-// Greedy nearest-neighbor picks one pair at a time and can lock in a locally-fine
-// choice that forces a worse pairing later — this checks all of them.
-function formPairsExhaustive(players) {
-  let best = null, bestScore = Infinity;
-  function recurse(remaining, pairs, scoreSoFar) {
-    if (scoreSoFar >= bestScore) return; // prune: can't beat the best found so far
-    if (remaining.length === 0) { best = pairs.slice(); bestScore = scoreSoFar; return; }
-    const first = remaining[0];
-    const rest = remaining.slice(1);
-    for (let i=0; i<rest.length; i++) {
-      const partner = rest[i];
-      const cost = getPartnerCount(first.name, partner.name);
-      pairs.push([first, partner]);
-      recurse(rest.slice(0,i).concat(rest.slice(i+1)), pairs, scoreSoFar + cost);
-      pairs.pop();
-    }
-  }
-  recurse(players, [], 0);
-  return best || [];
-}
-
-// Up to 3 courts (12 players => 10395 possible pairings) the exhaustive search is
-// near-instant; beyond that it explodes combinatorially, so fall back to greedy.
-function formPairs(players) {
-  return players.length <= 12 ? formPairsExhaustive(players) : formPairsGreedy(players);
-}
-
 function courtMatchScore(p1, p2) {
   let score = 0;
   p1.forEach(a => p2.forEach(b => {
@@ -943,20 +914,89 @@ function countGenderViolations(courts) {
   ).length;
 }
 
+// Jointly considers (a) how players are split into partner-pairs and (b) how those
+// pairs are matched into courts, so gender balance can influence WHO PARTNERS WHOM —
+// not just who each finished pair happens to face.
+//
+// This replaces choosing partners first (blind to gender) and only fixing court
+// matchups afterwards. That two-stage approach couldn't prevent a forced
+// female-pair-vs-male-pair whenever the repeat-minimising pairing happened to split
+// cleanly by gender (e.g. exactly 2 pairs on one court: if they land on one all-female
+// pair and one all-male pair, there is no second matchup to try — those two pairs MUST
+// face each other).
+//
+// Fully cross-checking every pairing against every court arrangement explodes
+// combinatorially past ~8 players, so this runs in two cheap phases instead:
+// 1) enumerate every way to split players into pairs, fast (no court-matching yet).
+// 2) run the existing court-matching optimiser (which already scores gender balance)
+//    on just a bounded slice of candidates, and keep whichever scores best overall.
+//
+// A pairing's gender composition forces a violation only when the count of
+// all-female pairs (F) and all-male pairs (M) are BOTH odd and there are zero mixed
+// pairs (X) to absorb the leftover of each — every other composition can always be
+// arranged violation-free. So candidates are sorted gender-safe-first, then by
+// repeat-cost — guaranteeing a safe split is checked whenever one exists at all,
+// rather than hoping it happens to also be cheap on repeats.
+const PAIRING_CANDIDATE_LIMIT = 50;
+
+function pairingForcesViolation(pairs) {
+  let F = 0, M = 0, X = 0;
+  pairs.forEach(([a,b]) => {
+    const g = teamGender([a,b]);
+    if (g === 'F') F++; else if (g === 'M') M++; else X++;
+  });
+  return F % 2 === 1 && M % 2 === 1 && X === 0;
+}
+
+function bestFullArrangement(players) {
+  const candidates = []; // { pairs, repeatCost, unsafe }
+  function collectPairings(remaining, pairs, repeatCost) {
+    if (remaining.length === 0) {
+      candidates.push({ pairs: pairs.slice(), repeatCost, unsafe: pairingForcesViolation(pairs) });
+      return;
+    }
+    const first = remaining[0];
+    const rest = remaining.slice(1);
+    for (let i=0; i<rest.length; i++) {
+      const partner = rest[i];
+      pairs.push([first, partner]);
+      collectPairings(rest.slice(0,i).concat(rest.slice(i+1)), pairs, repeatCost + getPartnerCount(first.name, partner.name));
+      pairs.pop();
+    }
+  }
+  collectPairings(players, [], 0);
+  candidates.sort((a,b) => (a.unsafe - b.unsafe) || (a.repeatCost - b.repeatCost));
+
+  let best = null, bestCost = Infinity;
+  candidates.slice(0, PAIRING_CANDIDATE_LIMIT).forEach(({ pairs, repeatCost }) => {
+    const { courts, score } = bestCourtAssignment(pairs);
+    const totalCost = repeatCost - score; // courtMatchScore is maximised; flip sign to combine
+    if (totalCost < bestCost) { bestCost = totalCost; best = courts; }
+  });
+  return best || [];
+}
+
 function formBalancedCourts(players) {
-  // Singles: every "team" is one player; matching still minimises repeat opponents
-  const singles = state.gameMode === 'singles';
+  if (state.gameMode === 'singles') {
+    // Every "team" is one player; no partnering to optimise, just opponent history.
+    return bestCourtAssignment(players.map(p => [p])).courts;
+  }
+  // Full joint search up to 3 courts (12 players => 10395 pairings, still near-instant).
+  // Beyond that the search space explodes, so fall back to the old greedy-pairing +
+  // reshuffle-until-safe approach — with 4+ courts there's enough spare room between
+  // pairs that a forced gender clash is far less likely in practice anyway.
+  if (players.length <= 12) return bestFullArrangement(players);
+
   let best = null, bestViol = Infinity;
   let order = players;
-  const attempts = singles ? 1 : 24;
-  for (let i=0; i<attempts; i++) {
-    const pairs = singles ? order.map(p => [p]) : formPairs(order);
+  for (let i=0; i<24; i++) {
+    const pairs = formPairsGreedy(order);
     if (pairs.length < 2) return [];
     const courts = bestCourtAssignment(pairs).courts;
     const viol = countGenderViolations(courts);
     if (viol < bestViol) { best = courts; bestViol = viol; }
     if (bestViol === 0) break;
-    order = shuffle(players); // re-pair and retry until no women-pair-vs-men-pair court
+    order = shuffle(players);
   }
   return best;
 }
@@ -1098,12 +1138,18 @@ function makeSimCtx() {
   state.players.forEach(p => cp[p.name] = p.courtsPlayed);
   const prevCourts = state.courts.length ? state.courts
     : (state.history.length ? state.history[0].courts : []);
-  return {
+  const ctx = {
     partnerHistory: {...state.partnerHistory},
     opponentHistory: {...state.opponentHistory},
     courtsPlayed: cp,
     prevCourts
   };
+  // The active round (if any) hasn't been submitted yet, so its pairings aren't in
+  // state.partnerHistory/courtsPlayed — register them here so every simulated future
+  // round knows about it too. Without this, the very next round could "cheaply" repeat
+  // the active round's exact partnerships, since the simulation would see them as unused.
+  if (state.courts.length) simRegister(ctx, { courts: state.courts });
+  return ctx;
 }
 
 function simRegister(ctx, round) {

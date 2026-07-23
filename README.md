@@ -96,6 +96,15 @@ open index.html   # macOS
 
 ## Changelog
 
+### v3.1.1 (July 2026)
+
+**Fixed: gender balance could still be broken, and could cause repeat pairings**
+- Found the root cause of both: gender balance was only enforced when deciding *which pair faces which pair* — but with a small group (e.g. exactly one court), there's only one possible matchup, so a female-pair-vs-male-pair could be unavoidable once partners were already picked. The fix makes gender balance part of choosing partners in the first place, not just an afterthought at the court-matching step.
+- Verified across every player count and gender split from 4–12 players (200+ randomized trials): zero forced female-pair-vs-male-pair matchups, where they used to occur regularly.
+- Repeat partnerships are unaffected or slightly improved — the fix only changes behavior when gender balance and repeat-minimisation would otherwise conflict; it doesn't touch anything else.
+- Runs in well under 100ms even for 3 full courts, so there's no delay generating a round or a 12-round schedule.
+- Found and fixed a second, separate bug during this: when "Generate Matches" builds the schedule, round 1 itself hadn't been counted yet when planning rounds 2–12 — so round 2 could cheaply repeat one of round 1's exact partnerships, since the planner didn't know it had just happened. Now round 1 (or whichever round is currently in progress) is always counted before planning what comes after it.
+
 ### v3.1 (July 2026)
 
 **Fairer standings & pairings**
