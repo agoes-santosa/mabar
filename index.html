@@ -750,8 +750,49 @@ function renderPlayerLive(s, round) {
   document.getElementById('pv-content').innerHTML = html;
 }
 
+// Sessions saved before pointsAgainst / matchPts existed don't carry those fields, so
+// Pts % and Match Pts would read as zero. Round history is the source of truth, so the
+// display stats are re-derived from it — the same arithmetic recalcAll() does locally.
+function derivePlayerStats(s) {
+  const byName = {};
+  (s.players || []).forEach(p => {
+    byName[p.name] = Object.assign({}, p, {
+      score:0, pointsAgainst:0, matchPts:0, wins:0, courtsPlayed:0, maxPossible:0
+    });
+  });
+  (s.history || []).forEach(h => {
+    (h.courts || []).forEach(c => {
+      const s1 = c.score1 || 0, s2 = c.score2 || 0;
+      const t1won = s1 > s2, t2won = s2 > s1, tie = s1 === s2;
+      const maxScore = Math.max(s1, s2);
+      const mp1 = t1won ? MATCH_PTS_WIN : tie ? MATCH_PTS_TIE : MATCH_PTS_LOSE;
+      const mp2 = t2won ? MATCH_PTS_WIN : tie ? MATCH_PTS_TIE : MATCH_PTS_LOSE;
+      (c.team1 || []).forEach(n => { const p = byName[n]; if (p) { p.score+=s1; p.pointsAgainst+=s2; p.courtsPlayed++; p.maxPossible+=maxScore; p.matchPts+=mp1; if (t1won) p.wins++; } });
+      (c.team2 || []).forEach(n => { const p = byName[n]; if (p) { p.score+=s2; p.pointsAgainst+=s1; p.courtsPlayed++; p.maxPossible+=maxScore; p.matchPts+=mp2; if (t2won) p.wins++; } });
+    });
+  });
+  const derived = Object.values(byName);
+  // A session with no round history (nothing ever saved) keeps whatever totals it had.
+  return (s.history || []).length ? derived : (s.players || []);
+}
+
+let pvSession = null;
+let pvSortMode = 'points';
+
+function setPlayerViewSort(mode) {
+  pvSortMode = mode;
+  if (pvSession) renderPlayerSummary(pvSession);
+}
+
 function renderPlayerSummary(s) {
-  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  pvSession = s;
+  const players = derivePlayerStats(s);
+  const sorted = sortPlayersBy(pvSortMode, players);
+  const metric = p => pvSortMode==='winrate' ? winRatePct(p)
+                    : pvSortMode==='ptspct' ? pointPct(p)
+                    : pvSortMode==='matchpts' ? matchPtsDisplay(p)
+                    : (p.score || 0);
+
   const podiumOrder = [sorted[1], sorted[0], sorted[2]].filter(Boolean);
   const avCls = ['podium-avatar-2', 'podium-avatar-1', 'podium-avatar-3'];
   const blCls = ['podium-block-2', 'podium-block-1', 'podium-block-3'];
@@ -761,7 +802,7 @@ function renderPlayerSummary(s) {
     <div class="podium-slot">
       <div class="podium-avatar ${avCls[i]}">${pvInitials(p.name)}</div>
       <div class="podium-name">${p.name}</div>
-      <div class="podium-pts">${p.score || 0} pts</div>
+      <div class="podium-pts">${metric(p)}${pvSortMode==='points'||pvSortMode==='matchpts' ? ' pts' : ''}</div>
       <div class="podium-pts">${p.courtsPlayed || 0} played</div>
       <div class="podium-block ${blCls[i]}">${medals[i]}</div>
     </div>`).join('');
@@ -772,8 +813,11 @@ function renderPlayerSummary(s) {
       <div class="sum-avatar">${pvInitials(p.name)}</div>
       <span style="flex:1;font-size:14px">${p.name}</span>
       <span style="font-size:12px;color:#aaa;margin-right:8px">${p.courtsPlayed || 0} played</span>
-      <span style="font-size:15px;font-weight:700">${p.score || 0}</span>
+      <span style="font-size:15px;font-weight:700">${metric(p)}</span>
     </div>`).join('');
+
+  const btn = (mode, label) =>
+    `<button class="sort-btn${pvSortMode===mode?' active':''}" onclick="setPlayerViewSort('${mode}')">${label}</button>`;
 
   document.getElementById('pv-finished').innerHTML = `
     <div class="summary-card">
@@ -784,8 +828,11 @@ function renderPlayerSummary(s) {
         </div>
         <div style="display:flex;justify-content:center;gap:2rem;margin-bottom:1.5rem">
           <div class="summary-stat"><div class="summary-stat-val">${(s.history || []).length}</div><div class="summary-stat-label">Rounds</div></div>
-          <div class="summary-stat"><div class="summary-stat-val">${s.players.length}</div><div class="summary-stat-label">Players</div></div>
-          <div class="summary-stat"><div class="summary-stat-val">${s.players.reduce((t,p)=>t+(p.score||0),0)}</div><div class="summary-stat-label">Total pts</div></div>
+          <div class="summary-stat"><div class="summary-stat-val">${(s.players||[]).length}</div><div class="summary-stat-label">Players</div></div>
+          <div class="summary-stat"><div class="summary-stat-val">${players.reduce((t,p)=>t+(p.score||0),0)}</div><div class="summary-stat-label">Total pts</div></div>
+        </div>
+        <div class="sort-toggle-row" style="justify-content:center;margin-bottom:1rem">
+          ${btn('points','Raw Pts')}${btn('winrate','Win %')}${btn('ptspct','Pts %')}${btn('matchpts','Match Pts')}
         </div>
         <div class="podium">${podiumHtml}</div>
         <div style="height:0.5px;background:#f0f0ec;margin:1rem 0"></div>
@@ -1473,8 +1520,9 @@ function diffOf(p) { return (p.score||0) - (p.pointsAgainst||0); }
 
 // Median rounds played among players who've played at least once. Used to gate
 // Win%/Pts% ranking so a small sample (e.g. 1-for-1) can't outrank a proven record.
-function medianPlayed() {
-  const counts = state.players.filter(p => p.courtsPlayed > 0).map(p => p.courtsPlayed).sort((a,b) => a-b);
+function medianPlayed(players) {
+  players = players || state.players;
+  const counts = players.filter(p => p.courtsPlayed > 0).map(p => p.courtsPlayed).sort((a,b) => a-b);
   if (!counts.length) return 0;
   const mid = Math.floor(counts.length / 2);
   return counts.length % 2 ? counts[mid] : (counts[mid-1] + counts[mid]) / 2;
@@ -1484,35 +1532,41 @@ function medianPlayed() {
 // by cmp among themselves), then everyone below that bar after (also sorted by cmp).
 // Guarantees the podium never highlights a small, lucky sample over a proven one,
 // while still showing every player with their real stats.
-function sortWithQualification(cmp) {
-  const median = medianPlayed();
-  const qualified = state.players.filter(p => p.courtsPlayed >= median);
-  const rest = state.players.filter(p => p.courtsPlayed < median);
+function sortWithQualification(cmp, players) {
+  players = players || state.players;
+  const median = medianPlayed(players);
+  const qualified = players.filter(p => p.courtsPlayed >= median);
+  const rest = players.filter(p => p.courtsPlayed < median);
   return [...qualified.sort(cmp), ...rest.sort(cmp)];
 }
 
-function getSortedPlayers() {
-  if (sortMode === 'winrate') {
+// Shared by the live standings, the summary, and the shared-link viewer, so a past
+// session ranks by exactly the same rules as a live one.
+function sortPlayersBy(mode, players) {
+  players = players || state.players;
+  if (mode === 'winrate') {
     return sortWithQualification((a,b) => {
       const ra = a.courtsPlayed ? (a.wins||0)/a.courtsPlayed : 0;
       const rb = b.courtsPlayed ? (b.wins||0)/b.courtsPlayed : 0;
       return rb - ra || b.score - a.score || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name);
-    });
+    }, players);
   }
-  if (sortMode === 'ptspct') {
+  if (mode === 'ptspct') {
     return sortWithQualification((a,b) => {
       const ra = a.maxPossible ? a.score/a.maxPossible : 0;
       const rb = b.maxPossible ? b.score/b.maxPossible : 0;
       return rb - ra || b.score - a.score || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name);
-    });
+    }, players);
   }
-  if (sortMode === 'matchpts') {
+  if (mode === 'matchpts') {
     // No qualification bar here: Match Pts is a total (like Raw Pts), not a rate, so it's
     // already volume-weighted and doesn't let a small sample rank ahead of a proven one.
-    return [...state.players].sort((a,b) => (b.matchPts||0) - (a.matchPts||0) || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name));
+    return [...players].sort((a,b) => (b.matchPts||0) - (a.matchPts||0) || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name));
   }
-  return [...state.players].sort((a,b) => b.score - a.score || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name));
+  return [...players].sort((a,b) => b.score - a.score || diffOf(b) - diffOf(a) || a.name.localeCompare(b.name));
 }
+
+function getSortedPlayers() { return sortPlayersBy(sortMode, state.players); }
 
 function matchPtsDisplay(p) {
   const v = p.matchPts||0;
@@ -1916,7 +1970,8 @@ function buildShareText() {
 
 // ── MENU / LIVE / HISTORY ─────────────────────────────────────────────────────
 
-const STALE_MS = 6 * 60 * 60 * 1000; // a session untouched this long is no longer "live"
+const STALE_MS = 6 * 60 * 60 * 1000;      // untouched this long → no longer shown as "live"
+const AUTO_END_MS = 24 * 60 * 60 * 1000;  // untouched this long → closed automatically
 
 function timeAgo(d) {
   if (!d) return '';
@@ -2016,6 +2071,7 @@ async function fetchRecentSessions(limit) {
       name: x.sessionName || 'Untitled session',
       round: x.round || 0,
       finished: !!x.isFinished,
+      autoEnded: !!x.autoEnded,
       players,
       when: x.updatedAt && x.updatedAt.toDate ? x.updatedAt.toDate() : null
     };
@@ -2024,6 +2080,28 @@ async function fetchRecentSessions(limit) {
 
 function isLive(s) {
   return !s.finished && s.when && (Date.now() - s.when.getTime()) < STALE_MS;
+}
+
+// A session left open for a day is treated as abandoned and closed, so it stops
+// lingering as "unfinished" forever. There's no server to run this on a timer, so it
+// happens whenever someone opens a list. Uses update() — not set() — so only these two
+// fields change and the round history in `payload` is never touched. The session open on
+// THIS device is always skipped: it's still being played, however long it's been idle.
+async function autoEndAbandoned(sessions) {
+  const stale = sessions.filter(s =>
+    !s.finished && s.code !== state.sessionCode &&
+    s.when && (Date.now() - s.when.getTime()) >= AUTO_END_MS
+  );
+  if (!stale.length) return [];
+  const closed = [];
+  for (const s of stale) {
+    try {
+      await db.collection('sessions').doc(s.code).update({ isFinished: true, autoEnded: true });
+      s.finished = true; s.autoEnded = true;
+      closed.push(s.code);
+    } catch(e) { /* leave it for the next viewer */ }
+  }
+  return closed;
 }
 
 async function refreshLiveCount() {
@@ -2046,7 +2124,9 @@ async function showLive() {
   const el = document.getElementById('live-list');
   el.className = 'list-loading'; el.textContent = 'Loading…';
   try {
-    const live = (await fetchRecentSessions(30)).filter(isLive);
+    const recent = await fetchRecentSessions(30);
+    await autoEndAbandoned(recent);
+    const live = recent.filter(isLive);
     if (!live.length) {
       el.className = 'list-empty';
       el.innerHTML = 'Nothing being played right now.<br><span style="font-size:13px">Sessions show up here while they\'re in progress.</span>';
@@ -2080,6 +2160,7 @@ async function showHistory() {
   el.className = 'list-loading'; el.textContent = 'Loading…';
   try {
     const all = await fetchRecentSessions(100);
+    await autoEndAbandoned(all);
     const past = all.filter(s => !isLive(s));
     if (!past.length) {
       el.className = 'list-empty';
@@ -2093,10 +2174,10 @@ async function showHistory() {
       if (m !== lastMonth) { html += `<div class="month-divider">${m}</div>`; lastMonth = m; }
       const d = s.when ? s.when.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }) : '';
       html += `<button class="session-row" onclick="openSessionByCode('${s.code}')">
-          <div class="session-icon">${s.finished ? '🏆' : '⏸'}</div>
+          <div class="session-icon">${s.autoEnded ? '⏳' : s.finished ? '🏆' : '⏸'}</div>
           <div class="session-main">
             <div class="session-name">${s.name}</div>
-            <div class="session-sub">${d} · ${s.round} ${s.round === 1 ? 'round' : 'rounds'} · ${s.players} players${s.finished ? '' : ' · unfinished'}</div>
+            <div class="session-sub">${d} · ${s.round} ${s.round === 1 ? 'round' : 'rounds'} · ${s.players} players${s.autoEnded ? ' · auto-ended' : s.finished ? '' : ' · unfinished'}</div>
           </div>
           <span class="menu-chevron">›</span>
         </button>`;
