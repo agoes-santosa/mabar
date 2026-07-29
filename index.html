@@ -185,6 +185,17 @@
 
   /* Menu, live list, history */
   .icon-btn { background: none; border: none; cursor: pointer; font-size: 20px; line-height: 1; padding: 6px 8px; border-radius: 8px; color: #666; min-width: 38px; min-height: 38px; display: flex; align-items: center; justify-content: center; }
+
+  /* Title screen: centred like a game menu. Only applies while the menu is open.
+     Header + tile list are the only visible children of .app here, so centering
+     .app as one flex block keeps the title sitting just above the buttons. */
+  body.menu-mode .app { min-height: 100dvh; padding-bottom: 1.5rem; display: flex; flex-direction: column; justify-content: center; }
+  @supports not (height: 100dvh) { body.menu-mode .app { min-height: 100vh; } }
+  body.menu-mode header { justify-content: center; padding: 0 0 .75rem; }
+  body.menu-mode header h1 { flex: none; text-align: center; font-size: 1.35rem; }
+  body.menu-mode #phase-badge { display: none; }
+  #view-menu { flex-direction: column; width: 100%; max-width: 420px; margin: 0 auto; }
+  .menu-footer { text-align: center; font-size: 12px; color: #bbb; margin-top: 1.25rem; }
   .resume-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: #f0effe; border: 1.5px solid #5b4fcf; border-radius: 14px; padding: 1rem 1.1rem; margin-bottom: .875rem; cursor: pointer; }
   .resume-label { font-size: 11px; font-weight: 700; color: #5b4fcf; text-transform: uppercase; letter-spacing: .06em; }
   .resume-name { font-size: 16px; font-weight: 700; margin-top: 2px; }
@@ -232,14 +243,6 @@
       <span class="menu-count" id="menu-live-count" style="display:none">0</span>
       <span class="menu-chevron">›</span>
     </button>
-    <button class="menu-tile" onclick="showHistory()">
-      <div class="menu-tile-icon">🕐</div>
-      <div class="menu-tile-main">
-        <div class="menu-tile-title">Session history</div>
-        <div class="menu-tile-sub">Every session ever played</div>
-      </div>
-      <span class="menu-chevron">›</span>
-    </button>
     <button class="menu-tile" onclick="newSessionFromMenu()">
       <div class="menu-tile-icon">＋</div>
       <div class="menu-tile-main">
@@ -248,6 +251,15 @@
       </div>
       <span class="menu-chevron">›</span>
     </button>
+    <button class="menu-tile" onclick="showHistory()">
+      <div class="menu-tile-icon">🕐</div>
+      <div class="menu-tile-main">
+        <div class="menu-tile-title">Session history</div>
+        <div class="menu-tile-sub">Every session ever played</div>
+      </div>
+      <span class="menu-chevron">›</span>
+    </button>
+    <div class="menu-footer">Made by Agoes Santosa</div>
   </div>
 
   <!-- LIVE LIST -->
@@ -362,6 +374,11 @@
         </div>
       </div>
 
+      <div id="ref-pin-hint" style="display:none;text-align:center;font-size:12px;color:#bbb;line-height:1.6;padding:.5rem 0 .25rem">
+        Referee PIN for this session: <b id="ref-pin-value" style="font-weight:700;letter-spacing:.12em"></b><br>
+        Share it with whoever should be able to take over.
+      </div>
+
       <div style="height:.5rem"></div>
     </div>
 
@@ -463,10 +480,26 @@
 
   <!-- PLAYER VIEW (read-only live) -->
   <div id="view-player" style="display:none">
+    <div id="pv-demoted" style="display:none;background:#fef3c7;border:1px solid #fbbf24;border-radius:12px;padding:.8rem .9rem;margin-bottom:.875rem;font-size:13px;color:#92400e;line-height:1.55">
+      <b>Someone else took over as referee.</b> Your app switched to viewing so your changes can't clash with theirs — nothing you already saved was lost. You can take control back with the PIN.
+    </div>
     <div id="pv-loading" style="text-align:center;padding:3rem 0;color:#bbb;font-size:15px">Loading session...</div>
     <div id="pv-content"></div>
     <div id="pv-finished"></div>
+    <button class="btn btn-primary btn-full" id="pv-takeover-btn" style="display:none;margin-top:.5rem" onclick="openTakeover()">🔑 Take over as referee</button>
     <div style="height:2rem"></div>
+  </div>
+</div>
+
+<div id="takeover-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;z-index:200;padding:1.5rem">
+  <div style="background:#fff;border-radius:16px;padding:1.5rem 1.35rem;max-width:330px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.15)">
+    <div style="width:44px;height:44px;border-radius:50%;background:#f0effe;color:#5b4fcf;display:flex;align-items:center;justify-content:center;font-size:19px;margin-bottom:.75rem">🔑</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Take over as referee</div>
+    <div style="font-size:13px;color:#888;line-height:1.55;margin-bottom:1rem">Enter this session's referee PIN — the current referee can read it off the bottom of their screen. They'll drop to viewing, and can take control back the same way.</div>
+    <input type="password" inputmode="numeric" maxlength="4" id="takeover-pin" placeholder="• • • •" style="text-align:center;letter-spacing:.3em;font-size:20px" onkeydown="if(event.key==='Enter')submitTakeover()" />
+    <div id="takeover-error" style="display:none;color:#dc2626;font-size:13px;margin-top:.5rem;line-height:1.5"></div>
+    <button class="btn btn-primary btn-full" style="margin-top:.875rem" id="takeover-submit" onclick="submitTakeover()">Take control</button>
+    <button style="display:block;width:100%;text-align:center;margin-top:.75rem;font-size:13px;color:#888;background:none;border:none;cursor:pointer;padding:6px" onclick="closeTakeover()">Cancel</button>
   </div>
 </div>
 
@@ -579,25 +612,102 @@ function generateSessionCode() {
 }
 
 let _firestoreTimer = null;
-function saveToFirestore() {
+// ── REFEREE BATON ─────────────────────────────────────────────────────────────
+// Exactly one device may write to a session at a time. The whole app state is stored
+// as a single JSON blob, so two writers would silently overwrite each other's rounds
+// entirely — not merge. The session doc names its controller; everyone else reads.
+
+function deviceId() {
+  let id = localStorage.getItem('mabar_device');
+  if (!id) {
+    id = 'd' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem('mabar_device', id);
+  }
+  return id;
+}
+const MY_DEVICE = deviceId();
+let holdsBaton = true;   // the device that starts a session owns it until told otherwise
+let ownSessionUnsub = null;
+
+function generateRefPin() { return String(Math.floor(1000 + Math.random() * 9000)); }
+
+// Watches our own session so losing control is noticed immediately, not just on next save.
+function watchOwnSession() {
+  if (ownSessionUnsub) { ownSessionUnsub(); ownSessionUnsub = null; }
   if (!state.sessionCode) return;
+  ownSessionUnsub = db.collection('sessions').doc(state.sessionCode).onSnapshot(doc => {
+    if (!doc.exists) return;
+    const owner = doc.data().controllerId;
+    if (holdsBaton && owner && owner !== MY_DEVICE) onBatonLost();
+  }, () => {});
+}
+
+function onBatonLost() {
+  holdsBaton = false;
+  clearTimeout(_firestoreTimer);              // drop any queued write so it can't clobber
+  if (ownSessionUnsub) { ownSessionUnsub(); ownSessionUnsub = null; }
+  const code = state.sessionCode;
+  sessionStorage.setItem('mabar_demoted', '1');
+  location.href = location.href.split('?')[0].replace(/\/index\.html$/, '/') + '?code=' + code;
+}
+
+function saveToFirestore() {
+  if (!state.sessionCode || !holdsBaton) return;
   clearTimeout(_firestoreTimer);
   _firestoreTimer = setTimeout(async () => {
+    const ref = db.collection('sessions').doc(state.sessionCode);
     try {
       const payload = JSON.parse(JSON.stringify(state, (k, v) => {
         if (k === 'bgPhoto') return null;
         if (v instanceof Set) return [...v];
         return v;
       }));
-      await db.collection('sessions').doc(state.sessionCode).set({
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        sessionName: state.sessionName || '',
-        round: state.round,
-        isFinished: state.isFinished || false,
-        payload: JSON.stringify(payload)
+      // Transaction: re-check ownership and write atomically, so a takeover landing
+      // mid-save can never be overwritten by a stale queued write.
+      await db.runTransaction(async tx => {
+        const doc = await tx.get(ref);
+        if (doc.exists) {
+          const owner = doc.data().controllerId;
+          if (owner && owner !== MY_DEVICE) throw new Error('BATON_LOST');
+        }
+        tx.set(ref, {
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          sessionName: state.sessionName || '',
+          round: state.round,
+          isFinished: state.isFinished || false,
+          controllerId: MY_DEVICE,
+          refPin: state.refPin || null,
+          payload: JSON.stringify(payload)
+        });
       });
-    } catch(e) { console.warn('Firestore sync failed:', e); }
+    } catch(e) {
+      if (e && e.message === 'BATON_LOST') onBatonLost();
+      else console.warn('Firestore sync failed:', e);
+    }
   }, 1500);
+}
+
+// Claim control of a live session by entering its PIN.
+async function claimBaton(code, pin) {
+  const ref = db.collection('sessions').doc(code);
+  const doc = await ref.get();
+  if (!doc.exists) return { ok: false, msg: 'Session not found.' };
+  const d = doc.data();
+  if (d.isFinished) return { ok: false, msg: 'This session has already ended.' };
+  if (!d.refPin) return { ok: false, msg: 'This session was created before referee handover existed, so it has no PIN.' };
+  if (String(d.refPin) !== String(pin).trim()) return { ok: false, msg: 'That PIN doesn\'t match.' };
+
+  let s;
+  try { s = JSON.parse(d.payload); } catch(e) { return { ok: false, msg: 'Could not read that session.' }; }
+  await ref.update({ controllerId: MY_DEVICE });
+
+  s.absentNext = new Set(s.absentNext || []);
+  s.sessionCode = code;
+  s.refPin = d.refPin;
+  state = s;
+  holdsBaton = true;
+  try { localStorage.setItem('mabar_v2', JSON.stringify(state, (k,v) => v instanceof Set ? [...v] : v)); } catch(e) {}
+  return { ok: true };
 }
 
 // ── SHARE MODAL ───────────────────────────────────────────────────────────────
@@ -609,6 +719,14 @@ function updateShareUI() {
     codeEl.textContent = state.sessionCode;
     row.style.display = 'flex';
   }
+  // Only the device holding the baton sees the PIN — showing it to viewers would defeat it.
+  const hint = document.getElementById('ref-pin-hint');
+  if (hint) {
+    const show = state.refPin && holdsBaton && !state.isFinished;
+    hint.style.display = show ? 'block' : 'none';
+    if (show) document.getElementById('ref-pin-value').textContent = state.refPin;
+  }
+  watchOwnSession();
 }
 
 function shareLink() {
@@ -640,9 +758,54 @@ function showShareToast(msg) {
   setTimeout(() => { t.style.opacity = '0'; setTimeout(() => { t.style.display = 'none'; }, 280); }, 2200);
 }
 
+function openTakeover() {
+  // Claiming a session replaces whatever is open on this device — say so first.
+  try {
+    const raw = localStorage.getItem('mabar_v2');
+    if (raw) {
+      const prev = JSON.parse(raw);
+      if (prev && !prev.isFinished && (prev.round || 0) > 0 && prev.sessionCode !== pvCode) {
+        const nm = prev.sessionName || 'Untitled session';
+        if (!confirm(`This will replace the session already open on this device ("${nm}"). Continue?`)) return;
+      }
+    }
+  } catch(e) {}
+  document.getElementById('takeover-overlay').style.display = 'flex';
+  document.getElementById('takeover-error').style.display = 'none';
+  document.getElementById('takeover-pin').value = '';
+  setTimeout(() => document.getElementById('takeover-pin').focus(), 50);
+}
+
+function closeTakeover() { document.getElementById('takeover-overlay').style.display = 'none'; }
+
+async function submitTakeover() {
+  const err = document.getElementById('takeover-error');
+  const btn = document.getElementById('takeover-submit');
+  const pin = document.getElementById('takeover-pin').value;
+  err.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Checking…';
+  let res;
+  try {
+    res = await claimBaton(pvCode, pin);
+  } catch(e) {
+    res = { ok: false, msg: 'Could not take control — check your connection.' };
+  }
+  if (!res.ok) {
+    err.textContent = res.msg;
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Take control';
+    return;
+  }
+  // Session adopted locally — reload without ?code= so it opens as the active game.
+  location.href = location.href.split('?')[0].replace(/\/index\.html$/, '/');
+}
+
 // ── PLAYER VIEW ───────────────────────────────────────────────────────────────
 
+let pvCode = null;
+
 function initPlayerView(code) {
+  pvCode = code;
   document.getElementById('view-setup').style.display = 'none';
   document.getElementById('view-game').style.display = 'none';
   document.getElementById('view-summary').style.display = 'none';
@@ -652,6 +815,13 @@ function initPlayerView(code) {
   document.getElementById('menu-btn').style.display = 'flex';
   document.getElementById('phase-badge').className = 'badge badge-live';
   document.getElementById('phase-badge').innerHTML = '<span class="live-dot"></span>Live';
+
+  // Arrived here because control was taken away — explain, then clear the flag so a
+  // later visit doesn't repeat it.
+  if (sessionStorage.getItem('mabar_demoted')) {
+    document.getElementById('pv-demoted').style.display = 'block';
+    sessionStorage.removeItem('mabar_demoted');
+  }
 
   db.collection('sessions').doc(code).onSnapshot(doc => {
     if (!doc.exists) {
@@ -665,6 +835,10 @@ function initPlayerView(code) {
 
     document.getElementById('pv-loading').style.display = 'none';
     document.querySelector('header h1').textContent = '🎾 ' + (s.sessionName || 'Live Session');
+
+    // Takeover is offered only while a session is genuinely running and has a PIN.
+    const canTakeOver = !data.isFinished && !!data.refPin && data.controllerId !== MY_DEVICE;
+    document.getElementById('pv-takeover-btn').style.display = canTakeOver ? 'inline-flex' : 'none';
 
     if (data.isFinished) {
       document.getElementById('pv-content').style.display = 'none';
@@ -923,6 +1097,8 @@ function startGame() {
   state.maxCourts = setupCourts;
   state.sessionName = document.getElementById('session-name-input').value.trim();
   state.sessionCode = generateSessionCode();
+  state.refPin = generateRefPin();
+  holdsBaton = true;
   document.getElementById('view-setup').style.display = 'none';
   document.getElementById('view-game').style.display = 'block';
   document.getElementById('tab-bar').style.display = 'flex';
@@ -1988,6 +2164,7 @@ function hideAllViews() {
     .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
   document.getElementById('tab-bar').style.display = 'none';
   document.getElementById('sticky-bar').style.display = 'none';
+  document.body.classList.remove('menu-mode');
 }
 
 // True when there's a session on this device worth returning to.
@@ -2002,7 +2179,8 @@ function showMenu() {
     return;
   }
   hideAllViews();
-  document.getElementById('view-menu').style.display = 'block';
+  document.body.classList.add('menu-mode');
+  document.getElementById('view-menu').style.display = 'flex';
   document.getElementById('menu-btn').style.display = 'none';
   document.getElementById('phase-badge').textContent = 'Menu';
   document.getElementById('phase-badge').className = 'badge badge-setup';
@@ -2049,6 +2227,7 @@ function resumeSession() {
   document.getElementById('phase-badge').textContent = 'Round ' + state.round;
   document.getElementById('phase-badge').className = 'badge badge-round';
   document.querySelector('header h1').textContent = '🎾 Tennis Mabar App';
+  updateShareUI();
   switchTab('courts');
 }
 

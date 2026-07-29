@@ -27,6 +27,8 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 - **Player management** — mark absences before a round, swap players between courts and the sitting-out bench, or add players mid-session.
 - **Session summary** — podium (with played count per player), full leaderboard from rank #4 down, and round history. Add a background photo with a gradient fade effect, reposition it with a slider, and export or share as an image.
 - **Live sharing** — tap "📡 Share live" during a session to get a short link. Anyone who opens it sees a live read-only view: courts, scores, standings — updating in real time as rounds are saved. When the session ends, the link automatically shows the final summary/podium.
+- **Live matches & session history** — the app opens to a menu: jump into any session currently being played, browse every session ever played (grouped by month), or start a new one. Opening a past or live session reuses the same real-time viewer as a shared link, including all four sort modes. A session left untouched for 24 hours ends and locks itself automatically, so an abandoned game doesn't sit "live" forever.
+- **Referee handover** — every session has a private 4-digit PIN, shown only to whoever's currently running it. From a live session (Live matches → tap it → scroll down), anyone with the PIN can take over as referee on their own device. Only one device can write to a session at a time — the moment control changes hands, the previous device is notified instantly and drops to a read-only view, with nothing it already saved lost.
 - **No install needed** — runs entirely in the browser, no account or internet required after first load.
 - **Offline-friendly** — session state is saved in `localStorage` so closing the tab won't lose your data.
 
@@ -34,7 +36,7 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 
 ## How to use
 
-1. Open the app on your phone
+1. Open the app — you'll land on the menu; tap **New session** to start (or **Live matches** / **Session history** to jump into an existing one)
 2. Pick a game mode — **👥 Doubles** (2 vs 2) or **👤 Singles** (1 vs 1)
 3. Enter a session name and set how many courts are available
 4. Add all players, and tap the ♂/♀ chip to mark each player's gender
@@ -95,6 +97,28 @@ open index.html   # macOS
 ---
 
 ## Changelog
+
+### v3.2 (July 2026)
+
+**Live matches & session history**
+- The app now opens to a menu instead of straight into session setup: **Live matches**, **New session**, **Session history** — plus a **Continue** card above them if this device has a session already in progress.
+- **Live matches** lists every session updated in the last 6 hours, with a live count badge on the menu tile.
+- **Session history** lists every session ever played, grouped by month.
+- Opening any session from either list — live or finished — reuses the same real-time read-only viewer as a shared link, so scores update live if it's still being played.
+- The four sort modes (Raw Pts / Win % / Pts % / Match Pts) are now available in that viewer too, including for sessions saved before some of the newer fields existed — their stats are recomputed from round history on the fly.
+- A session left untouched for 24 hours ends and locks itself automatically, so an abandoned game doesn't sit in the live list forever.
+
+**Referee handover**
+- Every session gets a private 4-digit PIN at creation, shown only to whoever currently holds it (small grey text near the share button) — there's no login, so the PIN is the only thing that gates control.
+- From a live session's viewer — Live matches → tap the session → scroll down — anyone with the PIN can tap **🔑 Take over as referee** to claim control on their own device. Deliberately not on the main menu, since it only makes sense in the context of one specific session.
+- Only one device can write to a session at a time. Every save re-checks who currently holds control before writing, so two referees can never silently overwrite each other.
+- The instant someone else takes over, the previous device is notified in real time and drops to the read-only viewer with a one-time explanation banner — nothing it had already saved is lost.
+
+**Landing page polish**
+- Title sits just above the three menu buttons, centered together as one group, instead of pinned to the top with a gap underneath.
+- Reordered to Live matches → New session → Session history.
+- The menu narrows to a compact centered column on wider screens; unchanged on phones.
+- Small "Made by Agoes Santosa" footer under the menu.
 
 ### v3.1.1 (July 2026)
 
