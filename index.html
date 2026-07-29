@@ -182,14 +182,84 @@
   .pv-teams-row { display: flex; align-items: center; margin-top: .625rem; gap: 6px; }
   .pv-team { flex: 1; font-size: 14px; font-weight: 600; line-height: 1.6; }
   .pv-score-box { font-size: 22px; font-weight: 800; color: #1a1a1a; text-align: center; padding: 0 8px; flex-shrink: 0; line-height: 1.4; }
+
+  /* Menu, live list, history */
+  .icon-btn { background: none; border: none; cursor: pointer; font-size: 20px; line-height: 1; padding: 6px 8px; border-radius: 8px; color: #666; min-width: 38px; min-height: 38px; display: flex; align-items: center; justify-content: center; }
+  .resume-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: #f0effe; border: 1.5px solid #5b4fcf; border-radius: 14px; padding: 1rem 1.1rem; margin-bottom: .875rem; cursor: pointer; }
+  .resume-label { font-size: 11px; font-weight: 700; color: #5b4fcf; text-transform: uppercase; letter-spacing: .06em; }
+  .resume-name { font-size: 16px; font-weight: 700; margin-top: 2px; }
+  .resume-sub { font-size: 12px; color: #888; margin-top: 2px; }
+  .menu-tile { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: #fff; border: 0.5px solid #e5e5e0; border-radius: 14px; padding: .95rem 1.1rem; margin-bottom: .625rem; cursor: pointer; min-height: 62px; }
+  .menu-tile-icon { width: 38px; height: 38px; border-radius: 10px; background: #f0f0ec; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+  .menu-tile-icon.live { background: #fee2e2; }
+  .menu-tile-main { flex: 1; min-width: 0; }
+  .menu-tile-title { font-size: 15px; font-weight: 600; }
+  .menu-tile-sub { font-size: 12px; color: #888; margin-top: 1px; }
+  .menu-count { font-size: 12px; font-weight: 700; color: #fff; background: #dc2626; border-radius: 20px; padding: 3px 9px; flex-shrink: 0; }
+  .menu-chevron { color: #ccc; font-size: 18px; flex-shrink: 0; }
+
+  .session-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: #fff; border: 0.5px solid #e5e5e0; border-radius: 14px; padding: .875rem 1rem; margin-bottom: .625rem; cursor: pointer; }
+  .session-row.is-live { border-color: #fecaca; }
+  .session-icon { width: 38px; height: 38px; border-radius: 10px; background: #f0effe; color: #5b4fcf; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .session-icon.live { background: #fee2e2; }
+  .session-main { flex: 1; min-width: 0; }
+  .session-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .session-sub { font-size: 12px; color: #888; margin-top: 2px; }
+  .session-time { font-size: 11px; color: #bbb; flex-shrink: 0; }
+  .month-divider { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: .06em; padding: 1rem 0 .5rem; }
+  .month-divider:first-child { padding-top: 0; }
+  .list-empty { text-align: center; padding: 2.5rem 1rem; color: #bbb; font-size: 14px; line-height: 1.6; }
+  .list-loading { text-align: center; padding: 2rem 1rem; color: #bbb; font-size: 14px; }
 </style>
 </head>
 <body>
 <div class="app">
   <header>
-    <h1>🎾 Tennis Mabar App</h1>
+    <button class="icon-btn" id="menu-btn" style="display:none;margin-left:-8px" onclick="showMenu()" aria-label="Menu">☰</button>
+    <h1 style="flex:1">🎾 Tennis Mabar App</h1>
     <span class="badge badge-setup" id="phase-badge">Setup</span>
   </header>
+
+  <!-- MENU -->
+  <div id="view-menu" style="display:none">
+    <div id="menu-resume-wrap"></div>
+    <button class="menu-tile" onclick="showLive()">
+      <div class="menu-tile-icon live"><span class="live-dot" style="margin:0"></span></div>
+      <div class="menu-tile-main">
+        <div class="menu-tile-title">Live matches</div>
+        <div class="menu-tile-sub">See what's being played right now</div>
+      </div>
+      <span class="menu-count" id="menu-live-count" style="display:none">0</span>
+      <span class="menu-chevron">›</span>
+    </button>
+    <button class="menu-tile" onclick="showHistory()">
+      <div class="menu-tile-icon">🕐</div>
+      <div class="menu-tile-main">
+        <div class="menu-tile-title">Session history</div>
+        <div class="menu-tile-sub">Every session ever played</div>
+      </div>
+      <span class="menu-chevron">›</span>
+    </button>
+    <button class="menu-tile" onclick="newSessionFromMenu()">
+      <div class="menu-tile-icon">＋</div>
+      <div class="menu-tile-main">
+        <div class="menu-tile-title">New session</div>
+        <div class="menu-tile-sub">Set up players and courts</div>
+      </div>
+      <span class="menu-chevron">›</span>
+    </button>
+  </div>
+
+  <!-- LIVE LIST -->
+  <div id="view-live" style="display:none">
+    <div id="live-list" class="list-loading">Loading…</div>
+    <div style="font-size:12px;color:#bbb;text-align:center;margin-top:.5rem;line-height:1.6">Sessions with no activity for 6 hours drop off automatically.</div>
+  </div>
+
+  <!-- HISTORY LIST -->
+  <div id="view-history" style="display:none">
+    <div id="history-sessions" class="list-loading">Loading…</div>
+  </div>
 
   <div id="tab-bar" class="tabs" style="display:none">
     <button class="tab active" onclick="switchTab('courts')" id="tab-courts">Courts</button>
@@ -579,6 +649,7 @@ function initPlayerView(code) {
   document.getElementById('view-player').style.display = 'block';
   document.getElementById('tab-bar').style.display = 'none';
   document.getElementById('sticky-bar').style.display = 'none';
+  document.getElementById('menu-btn').style.display = 'flex';
   document.getElementById('phase-badge').className = 'badge badge-live';
   document.getElementById('phase-badge').innerHTML = '<span class="live-dot"></span>Live';
 
@@ -1843,6 +1914,200 @@ function buildShareText() {
   return `🎾 ${state.sessionName||'Tennis Mabar'} Results\n`+sorted.map((p,i)=>`${i+1}. ${p.name} — ${p.score} pts`).join('\n');
 }
 
+// ── MENU / LIVE / HISTORY ─────────────────────────────────────────────────────
+
+const STALE_MS = 6 * 60 * 60 * 1000; // a session untouched this long is no longer "live"
+
+function timeAgo(d) {
+  if (!d) return '';
+  const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+  if (s < 60) return Math.floor(s) + ' sec ago';
+  if (s < 3600) return Math.floor(s / 60) + ' min ago';
+  if (s < 86400) { const h = Math.round(s / 3600); return h + (h === 1 ? ' hour ago' : ' hours ago'); }
+  const days = Math.round(s / 86400);
+  return days + (days === 1 ? ' day ago' : ' days ago');
+}
+
+function hideAllViews() {
+  ['view-setup','view-game','view-summary','view-player','view-menu','view-live','view-history']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+  document.getElementById('tab-bar').style.display = 'none';
+  document.getElementById('sticky-bar').style.display = 'none';
+}
+
+// True when there's a session on this device worth returning to.
+function hasSessionInProgress() {
+  return !state.isFinished && state.round > 0 && state.players.length >= perCourt();
+}
+
+function showMenu() {
+  // In the shared-link viewer there's no local session state, so drop the ?code= and reload.
+  if (typeof _playerViewCode !== 'undefined' && _playerViewCode) {
+    location.href = location.href.split('?')[0].replace(/\/index\.html$/, '/');
+    return;
+  }
+  hideAllViews();
+  document.getElementById('view-menu').style.display = 'block';
+  document.getElementById('menu-btn').style.display = 'none';
+  document.getElementById('phase-badge').textContent = 'Menu';
+  document.getElementById('phase-badge').className = 'badge badge-setup';
+  document.querySelector('header h1').textContent = '🎾 Tennis Mabar App';
+
+  const wrap = document.getElementById('menu-resume-wrap');
+  if (hasSessionInProgress()) {
+    wrap.innerHTML = `<button class="resume-card" onclick="resumeSession()">
+        <div style="flex:1;min-width:0">
+          <div class="resume-label">▸ Continue</div>
+          <div class="resume-name">${sessionLabel() || 'Session in progress'}</div>
+          <div class="resume-sub">Round ${state.round} · ${state.players.length} players</div>
+        </div>
+        <span class="menu-chevron">›</span>
+      </button>`;
+  } else {
+    wrap.innerHTML = '';
+  }
+  refreshLiveCount();
+}
+
+function newSessionFromMenu() {
+  if (hasSessionInProgress() && !confirm('You have a session in progress. Starting a new one will replace it. Continue?')) return;
+  hideAllViews();
+  document.getElementById('view-setup').style.display = 'block';
+  document.getElementById('menu-btn').style.display = 'flex';
+  document.getElementById('phase-badge').textContent = 'Setup';
+  document.getElementById('phase-badge').className = 'badge badge-setup';
+  state = { players:[], round:0, maxCourts:1, sessionName:'', gameMode:'doubles', schedule:[], bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, absentNext:new Set() };
+  setupCourts = 1; setupMode = 'doubles';
+  document.getElementById('courts-count-display').textContent = setupCourts;
+  document.getElementById('session-name-input').value = '';
+  setGameMode('doubles');
+  renderSetup();
+  save();
+}
+
+function resumeSession() {
+  hideAllViews();
+  document.getElementById('view-game').style.display = 'block';
+  document.getElementById('tab-bar').style.display = 'flex';
+  document.getElementById('sticky-bar').style.display = 'block';
+  document.getElementById('menu-btn').style.display = 'flex';
+  document.getElementById('phase-badge').textContent = 'Round ' + state.round;
+  document.getElementById('phase-badge').className = 'badge badge-round';
+  document.querySelector('header h1').textContent = '🎾 Tennis Mabar App';
+  switchTab('courts');
+}
+
+// Opening a session from a list reuses the existing ?code= viewer — one mechanism
+// for both live sessions and finished ones (which render as the summary).
+function openSessionByCode(code) {
+  location.href = location.href.split('?')[0].replace(/\/index\.html$/, '/') + '?code=' + code;
+}
+
+// Both lists sort by updatedAt only (a single-field sort needs no composite index)
+// and filter in the browser, so nothing extra has to be configured in Firebase.
+async function fetchRecentSessions(limit) {
+  const snap = await db.collection('sessions').orderBy('updatedAt', 'desc').limit(limit).get();
+  return snap.docs.map(d => {
+    const x = d.data();
+    let players = 0;
+    try { players = (JSON.parse(x.payload || '{}').players || []).length; } catch(e) {}
+    return {
+      code: d.id,
+      name: x.sessionName || 'Untitled session',
+      round: x.round || 0,
+      finished: !!x.isFinished,
+      players,
+      when: x.updatedAt && x.updatedAt.toDate ? x.updatedAt.toDate() : null
+    };
+  });
+}
+
+function isLive(s) {
+  return !s.finished && s.when && (Date.now() - s.when.getTime()) < STALE_MS;
+}
+
+async function refreshLiveCount() {
+  try {
+    const live = (await fetchRecentSessions(30)).filter(isLive);
+    const badge = document.getElementById('menu-live-count');
+    badge.textContent = live.length;
+    badge.style.display = live.length ? 'inline-block' : 'none';
+  } catch(e) { /* offline — leave the badge hidden */ }
+}
+
+async function showLive() {
+  hideAllViews();
+  document.getElementById('view-live').style.display = 'block';
+  document.getElementById('menu-btn').style.display = 'flex';
+  document.querySelector('header h1').textContent = 'Live matches';
+  document.getElementById('phase-badge').className = 'badge badge-live';
+  document.getElementById('phase-badge').innerHTML = '<span class="live-dot"></span>Live';
+
+  const el = document.getElementById('live-list');
+  el.className = 'list-loading'; el.textContent = 'Loading…';
+  try {
+    const live = (await fetchRecentSessions(30)).filter(isLive);
+    if (!live.length) {
+      el.className = 'list-empty';
+      el.innerHTML = 'Nothing being played right now.<br><span style="font-size:13px">Sessions show up here while they\'re in progress.</span>';
+      return;
+    }
+    el.className = '';
+    el.innerHTML = live.map(s => `
+      <button class="session-row is-live" onclick="openSessionByCode('${s.code}')">
+        <div class="session-icon live"><span class="live-dot" style="margin:0"></span></div>
+        <div class="session-main">
+          <div class="session-name">${s.name}</div>
+          <div class="session-sub">Round ${s.round} · ${s.players} players</div>
+        </div>
+        <div style="text-align:right"><div class="session-time">${timeAgo(s.when)}</div><span class="menu-chevron">›</span></div>
+      </button>`).join('');
+  } catch(e) {
+    el.className = 'list-empty';
+    el.textContent = 'Could not load live matches — check your connection.';
+  }
+}
+
+async function showHistory() {
+  hideAllViews();
+  document.getElementById('view-history').style.display = 'block';
+  document.getElementById('menu-btn').style.display = 'flex';
+  document.querySelector('header h1').textContent = 'Session history';
+  document.getElementById('phase-badge').textContent = 'History';
+  document.getElementById('phase-badge').className = 'badge badge-setup';
+
+  const el = document.getElementById('history-sessions');
+  el.className = 'list-loading'; el.textContent = 'Loading…';
+  try {
+    const all = await fetchRecentSessions(100);
+    const past = all.filter(s => !isLive(s));
+    if (!past.length) {
+      el.className = 'list-empty';
+      el.textContent = 'No past sessions yet.';
+      return;
+    }
+    el.className = '';
+    let lastMonth = null, html = '';
+    past.forEach(s => {
+      const m = s.when ? s.when.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Undated';
+      if (m !== lastMonth) { html += `<div class="month-divider">${m}</div>`; lastMonth = m; }
+      const d = s.when ? s.when.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }) : '';
+      html += `<button class="session-row" onclick="openSessionByCode('${s.code}')">
+          <div class="session-icon">${s.finished ? '🏆' : '⏸'}</div>
+          <div class="session-main">
+            <div class="session-name">${s.name}</div>
+            <div class="session-sub">${d} · ${s.round} ${s.round === 1 ? 'round' : 'rounds'} · ${s.players} players${s.finished ? '' : ' · unfinished'}</div>
+          </div>
+          <span class="menu-chevron">›</span>
+        </button>`;
+    });
+    el.innerHTML = html;
+  } catch(e) {
+    el.className = 'list-empty';
+    el.textContent = 'Could not load history — check your connection.';
+  }
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
 const _playerViewCode = new URLSearchParams(location.search).get('code');
@@ -1855,16 +2120,19 @@ if (_playerViewCode) {
   if (state.isFinished && state.round > 0) {
     setupCourts = state.maxCourts || 1;
     document.getElementById('view-setup').style.display = 'none';
+    document.getElementById('menu-btn').style.display = 'flex';
     document.getElementById('phase-badge').textContent = 'Finished';
     document.getElementById('phase-badge').className = 'badge badge-setup';
     document.getElementById('view-summary').style.display = 'block';
     renderSummary();
   } else if (state.round > 0 && state.players.length >= perCourt()) {
+    // A session in progress still resumes straight onto the court — the menu is a tap away.
     setupCourts = state.maxCourts || 1;
     document.getElementById('view-setup').style.display = 'none';
     document.getElementById('view-game').style.display = 'block';
     document.getElementById('tab-bar').style.display = 'flex';
     document.getElementById('sticky-bar').style.display = 'block';
+    document.getElementById('menu-btn').style.display = 'flex';
     document.getElementById('phase-badge').textContent = 'Round ' + state.round;
     document.getElementById('phase-badge').className = 'badge badge-round';
     document.getElementById('round-num').textContent = state.round;
@@ -1875,6 +2143,7 @@ if (_playerViewCode) {
   } else {
     document.getElementById('courts-count-display').textContent = setupCourts;
     renderSetup();
+    showMenu();
   }
 }
 </script>
