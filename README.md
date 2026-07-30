@@ -19,6 +19,7 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 - **Full 12-round schedule** — "Generate Matches" creates round 1 plus 11 upcoming rounds you can scroll through, so everyone knows what's coming. Each upcoming round has its own 🔀 redraw button, **＋ Add round** extends the plan past 12, and the whole schedule updates live when you mark absences, swap players, or add someone mid-session. The schedule is guaranteed accurate — the round you play is exactly the one shown.
 - **Play rounds in any order** — tap **▶ Play** on any upcoming round to play it now (e.g. someone stepped out and a later round fits who's on court). Your current lineup is parked in that round's slot — marked **⏸ parked** — with any typed scores kept, waiting until you come back to it. Nothing else is reshuffled.
 - **Gender-balanced doubles** — mark players ♂/♀ with one tap on the player list. In doubles, an all-female pair is never matched against an all-male pair; mixed pairings are unrestricted. Female players get a small ♀ mark on court cards so balance is visible at a glance.
+- **Fixed partners & fixed teams** — tap the **Team** chip on any player to put them in Team 1–6. One rule covers both uses: *teammates partner each other whenever both are on court, and never face each other.* So a team of exactly **2 is a fixed pair** (they're always partners, and rest together rather than being split), while a **bigger team plays as a team** — it fields whole sides across courts, and an odd member partners outside the team for that round. Everyone defaults to no team and shuffles freely as before. Works in Singles too, where it simply means teammates never play each other. Teams show a coloured T-tag on court cards and in the schedule, and the setup screen warns you if a team can't be seated (a 3-person team can't share one doubles court) or if a pair will end up playing every round.
 - **Flexible courts** — set 1 to 6 courts at the start; the app fills them optimally each round.
 - **Four sort modes** — view standings by **Raw Pts** (games won), **Win %** (wins ÷ courts played), **Pts %** (points scored ÷ maximum possible), or **Match Pts** (a flat 2 points for a win, 1 for a loss — rewards winning the match itself over the scoreline). Available in both the in-game Standings tab and the Summary screen. Exact ties (same value on the active mode) are broken automatically by point differential — total games won minus games lost across the session.
 - **Small-sample protection** — in Win % and Pts % mode, players need at least the median number of rounds played (among everyone who's played) to rank in the top 3. A player who joined late and went 1-for-1 won't out-rank someone with a full, proven record — they still appear in the list with their real stats, just not on the podium. Raw Pts and Match Pts are unaffected, since both already reward playing more rounds.
@@ -39,7 +40,7 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 1. Open the app — you'll land on the menu; tap **New session** to start (or **Live matches** / **Session history** to jump into an existing one)
 2. Pick a game mode — **👥 Doubles** (2 vs 2) or **👤 Singles** (1 vs 1)
 3. Enter a session name and set how many courts are available
-4. Add all players, and tap the ♂/♀ chip to mark each player's gender
+4. Add all players, tap the ♂/♀ chip to mark each player's gender, and tap the **Team** chip if anyone should have a fixed partner or belong to a fixed team
 5. Tap **Generate Matches** — round 1 starts and a full 12-round schedule appears below the courts
 6. Enter scores after each match, tap **Save & next round**
 7. Use **Reshuffle** to re-draw the current round before scores are entered, or 🔀 on any upcoming round to redraw it
@@ -63,6 +64,16 @@ Each round, active players are split into two pools:
 Selection within each pool is random, so no priority debt accumulates and late arrivals don't get unfairly favoured with consecutive rounds. For exact group sizes where the preferred pool would equal the number of slots (e.g. 8 players, 1 court), one player is swapped between pools once everyone has had at least one turn — this prevents the same two groups from alternating forever.
 
 Once players are selected, the app minimises repeat partnerships and promotes former partners to face each other as opponents.
+
+### Fixed partners and teams
+
+If any player has a team, one extra rule applies throughout: **teammates partner each other whenever both are on court, and never face each other.**
+
+Because a court side holds two players, a team of exactly 2 is therefore a fixed pair, and a larger team fills whole sides. This changes *who gets selected*, not just who partners whom — teams are chosen in intact blocks, so a pair is never picked without its other half. A team can hold at most one side per court (two players per court in doubles, one in singles); past that its own members would have to play each other, so the extra members rest that round. An odd-sized team pairs up as far as it can and its leftover member partners outside the team, rotating each round so it isn't always the same person.
+
+Where a team and gender balance genuinely conflict — an all-male pair that can only face an all-female pair — the team wins, since it was set deliberately.
+
+The cost is rotation freedom. Measured over 12 rounds, teams make almost no difference (a spread of 3.2 rounds vs 2.8 without, at 9 players on 2 courts). The exception is a field barely bigger than one court: at 5 players on 1 court a fixed pair plays every round, because resting both would need 4 unteamed players and only 3 exist. The setup screen calls that out.
 
 ---
 
@@ -97,6 +108,21 @@ open index.html   # macOS
 ---
 
 ## Changelog
+
+### v3.3 (July 2026)
+
+**Fixed partners & fixed teams**
+- New **Team** chip on every player (setup screen and Players tab) — tap it to open a picker and assign Team 1–6, or leave it on "No team". The picker shows how many players are already in each team. Everyone defaults to no team, so existing behaviour is unchanged unless you use this.
+- One rule drives both use cases: *teammates partner each other whenever both are on court, and never face each other.* A team of exactly 2 is a fixed pair; a larger team plays as a team, fielding whole sides across courts.
+- Teams change **who gets selected**, not just who partners whom — players are picked in intact team blocks, so a fixed pair is never selected without its other half, and the two rest together instead of being split.
+- An odd-sized team pairs up as far as it can, and its leftover member partners outside the team for that round — rotating who that is, so it isn't always the same person.
+- A team can hold at most one side per court, so any extra members rest that round rather than being forced to play each other.
+- Works in **Singles** too, where the rule reduces to "teammates never play each other" — handy for a 2-vs-2 team singles format.
+- Teams show a coloured **T** tag on court cards and throughout the schedule, so you can see at a glance that the draw respected them.
+- **Setup validation**: combinations that genuinely can't be seated are blocked with an explanation rather than quietly leaving a court short (a 3-person team can't share one doubles court; everyone on one team leaves nobody to play). A softer amber warning covers the case where a pair will unavoidably play every round.
+- Where a team and gender balance conflict, the team wins — it was set deliberately.
+- Side effect: teams make the pairing search **faster**, because they prune it. 12 players on 3 courts drops from ~17ms to ~6ms with one fixed pair, and to well under 1ms when everyone is paired.
+- Verified across 21 configurations — 6,300 live rounds plus 6,300 pre-generated schedule rounds — with zero rule violations, zero short courts, and no measurable change to rotation fairness except the tight-field case noted above.
 
 ### v3.2 (July 2026)
 

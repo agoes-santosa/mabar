@@ -99,6 +99,12 @@
   .gender-chip.g-m { background: #e0f2fe; color: #0369a1; }
   .gender-chip.g-f { background: #fce7f3; color: #be185d; }
   .fem-mark { color: #db2777; font-size: 11px; font-weight: 700; }
+  .team-chip { border: none; border-radius: 20px; font-size: 12px; font-weight: 700; min-width: 40px; min-height: 30px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; background: #f0f0ec; color: #999; }
+  .team-mark { font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 6px; color: #fff; vertical-align: 1px; }
+  #team-picker { position: fixed; background: #fff; border-radius: 12px; border: 0.5px solid #e5e5e0; padding: 6px; box-shadow: 0 4px 24px rgba(0,0,0,0.15); z-index: 150; min-width: 160px; }
+  .team-opt { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: none; border: none; padding: 9px 12px; font-size: 15px; font-weight: 600; color: #1a1a1a; cursor: pointer; border-radius: 8px; }
+  .team-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .team-warn { background: #fef3c7; border: 1px solid #fbbf24; border-radius: 10px; padding: .7rem .8rem; margin-top: .75rem; font-size: 12.5px; color: #92400e; line-height: 1.55; }
 
   .sched-round { padding: 10px 0; border-bottom: 0.5px dashed #e0e0dc; }
   .sched-round:last-child { border-bottom: none; }
@@ -314,6 +320,7 @@
         <input type="text" id="new-player-input" placeholder="Player name" onkeydown="if(event.key==='Enter')addPlayer()" />
         <button class="btn btn-primary btn-sm" onclick="addPlayer()">Add</button>
       </div>
+      <div id="team-warning" class="team-warn" style="display:none"></div>
     </div>
     <div id="start-error" style="color:#dc2626;font-size:14px;margin-bottom:.75rem;display:none"></div>
     <button class="btn btn-primary btn-full" onclick="startGame()">Generate Matches</button>
@@ -510,6 +517,11 @@
   <div id="swap-picker-opts"></div>
 </div>
 
+<div id="team-picker" style="display:none">
+  <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;padding:4px 12px 4px">Fixed partner / team</div>
+  <div id="team-picker-opts"></div>
+</div>
+
 <div class="sticky-actions" id="sticky-bar" style="display:none">
   <div class="sticky-inner">
     <button class="btn btn-primary" style="flex:1" onclick="submitRound()">Save &amp; next round</button>
@@ -552,6 +564,7 @@ function setGameMode(m) {
   setupMode = m;
   document.getElementById('mode-doubles-btn').classList.toggle('active', m === 'doubles');
   document.getElementById('mode-singles-btn').classList.toggle('active', m === 'singles');
+  renderTeamWarning();   // singles seats half as many per court, so feasibility differs
 }
 
 let state = {
@@ -589,7 +602,7 @@ function load() {
       p.partnerHistory = p.partnerHistory || {};
       p.opponentHistory = p.opponentHistory || {};
       const needsRecalc = (p.players || []).some(pl => pl.pointsAgainst == null || pl.matchPts == null);
-      (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; pl.gender = pl.gender || 'M'; pl.pointsAgainst = pl.pointsAgainst || 0; pl.matchPts = pl.matchPts || 0; });
+      (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; pl.gender = pl.gender || 'M'; pl.team = pl.team || 0; pl.pointsAgainst = pl.pointsAgainst || 0; pl.matchPts = pl.matchPts || 0; });
       if (p.bgPhotoY == null) p.bgPhotoY = 35;
       if (p.sessionCode == null) p.sessionCode = null;
       if (p.isFinished == null) p.isFinished = false;
@@ -702,6 +715,7 @@ async function claimBaton(code, pin) {
   await ref.update({ controllerId: MY_DEVICE });
 
   s.absentNext = new Set(s.absentNext || []);
+  (s.players || []).forEach(pl => { pl.team = pl.team || 0; });
   s.sessionCode = code;
   s.refPin = d.refPin;
   state = s;
@@ -1028,6 +1042,7 @@ function avatarHtml(player, size=36, fontSize=13) {
 function changeCourts(delta) {
   setupCourts = Math.max(1, Math.min(6, setupCourts + delta));
   document.getElementById('courts-count-display').textContent = setupCourts;
+  renderTeamWarning();   // court count changes how many of a team can be seated
 }
 
 // ── SETUP ────────────────────────────────────────────────────────────────────
@@ -1050,29 +1065,125 @@ function toggleGender(name) {
   }
 }
 
-// Female names get a small ♀ so gender balance is visible on courts
+// Female names get a small ♀ so gender balance is visible on courts, and teamed
+// players get a coloured team tag so you can see the draw respected the pairing.
 function nameHtml(name) {
   const p = state.players.find(x=>x.name===name);
-  return p && p.gender === 'F' ? `${name} <span class="fem-mark">♀</span>` : name;
+  if (!p) return name;
+  let out = name;
+  if (p.gender === 'F') out += ' <span class="fem-mark">♀</span>';
+  if (p.team) out += ` <span class="team-mark" style="background:${teamColor(p.team)}">T${p.team}</span>`;
+  return out;
+}
+
+// ── TEAM PICKER ───────────────────────────────────────────────────────────────
+// A cycling toggle would need up to 6 taps per player; a picker is always two.
+function teamChipHtml(p) {
+  if (!p.team) return `<button class="team-chip" onclick="openTeamPicker('${p.name}',this)">Team</button>`;
+  return `<button class="team-chip" style="background:${teamColor(p.team)};color:#fff" onclick="openTeamPicker('${p.name}',this)">T${p.team}</button>`;
+}
+
+function openTeamPicker(name, btn) {
+  const p = state.players.find(x=>x.name===name);
+  if (!p) return;
+  const opts = [`<button class="team-opt" onclick="setTeam('${name}',0)">
+      <span class="team-dot" style="background:#d5d5d0"></span>No team${!p.team?' ✓':''}</button>`];
+  for (let t=1; t<=MAX_TEAMS; t++) {
+    const n = state.players.filter(x => x.team === t).length;
+    opts.push(`<button class="team-opt" onclick="setTeam('${name}',${t})">
+      <span class="team-dot" style="background:${teamColor(t)}"></span>Team ${t}
+      <span style="margin-left:auto;font-size:12px;color:#bbb;font-weight:600">${n?n+' in':''}</span>${p.team===t?' ✓':''}</button>`);
+  }
+  const picker = document.getElementById('team-picker');
+  document.getElementById('team-picker-opts').innerHTML = opts.join('');
+  const r = btn.getBoundingClientRect();
+  picker.style.left = Math.max(8, Math.min(r.left - 60, window.innerWidth - 180)) + 'px';
+  picker.style.top  = Math.min(r.bottom + 6, window.innerHeight - 300) + 'px';
+  picker.style.display = 'block';
+}
+
+function setTeam(name, t) {
+  document.getElementById('team-picker').style.display = 'none';
+  const p = state.players.find(x=>x.name===name);
+  if (!p || p.team === t) return;
+  p.team = t;
+  save();
+  if (state.round > 0) { regenerateSchedule(); renderCourts(); renderPlayerListGame(); }
+  else renderSetup();
+}
+
+document.addEventListener('click', e => {
+  const p = document.getElementById('team-picker');
+  if (p && p.style.display !== 'none' && !p.contains(e.target) && !e.target.classList.contains('team-chip')) {
+    p.style.display = 'none';
+  }
+}, true);
+
+// Teams are hard constraints, so some combinations genuinely can't be seated: a team
+// can only hold one side per court. Say so at setup instead of quietly leaving a
+// court short at round 1.
+function teamFeasibility(players, courts, mode) {
+  const per = mode === 'singles' ? 2 : 4;
+  const numCourts = Math.min(Math.floor(players.length / per), courts);
+  if (numCourts < 1) return null;
+  const slots = numCourts * per;
+  const cap = mode === 'singles' ? numCourts : 2 * numCourts;
+  const sizes = {};
+  players.forEach(p => { if (p.team) sizes[p.team] = (sizes[p.team]||0) + 1; });
+  const teams = Object.entries(sizes);
+  if (!teams.length) return null;
+  const seatable = teams.reduce((n,[,sz]) => n + Math.min(sz, cap), 0)
+                 + players.filter(p => !p.team).length;
+  if (seatable < slots) {
+    const tooBig = teams.filter(([,sz]) => sz > cap).map(([t]) => 'Team '+t);
+    return { level: 'error', msg: tooBig.length
+      ? `${tooBig.join(' and ')} ${tooBig.length>1?'are':'is'} too big for ${numCourts} court${numCourts>1?'s':''} — a team can only hold one side per court, so at most ${cap} of them can play at once. Add a court or move someone out.`
+      : `With these teams there aren't enough non-teammates to fill ${numCourts} court${numCourts>1?'s':''} — teammates would have to play against each other. Add unteamed players or reduce courts.` };
+  }
+  // Not impossible, but worth flagging: a pair that can never be rested.
+  const unteamed = players.filter(p => !p.team).length;
+  if (mode !== 'singles' && unteamed > 0 && unteamed < per && teams.length === 1 && +teams[0][1] === 2) {
+    return { level: 'warn', msg: `Heads up: with only ${unteamed} unteamed player${unteamed>1?'s':''}, Team ${teams[0][0]} will play every round — there aren't enough others to rest them. Everything still works, court time just won't be even.` };
+  }
+  return null;
 }
 
 function renderSetup() {
   const list = document.getElementById('player-list-setup');
-  if (!state.players.length) { list.innerHTML = '<div class="empty-state">No players yet</div>'; return; }
+  if (!state.players.length) {
+    list.innerHTML = '<div class="empty-state">No players yet</div>';
+    renderTeamWarning();
+    return;
+  }
   list.innerHTML = state.players.map((p,i) => `
     <div class="player-row">
       ${avatarHtml(p)}
       <div class="player-name">${p.name}</div>
+      ${teamChipHtml(p)}
       ${genderChipHtml(p)}
       <button class="btn-icon" onclick="removePlayerSetup(${i})">✕</button>
     </div>`).join('');
+  renderTeamWarning();
+}
+
+function renderTeamWarning() {
+  const el = document.getElementById('team-warning');
+  if (!el) return;
+  const r = teamFeasibility(state.players, setupCourts, setupMode);
+  el.style.display = r ? 'block' : 'none';
+  if (!r) return;
+  el.textContent = r.msg;
+  const bad = r.level === 'error';
+  el.style.background   = bad ? '#fee2e2' : '#fef3c7';
+  el.style.borderColor  = bad ? '#fca5a5' : '#fbbf24';
+  el.style.color        = bad ? '#991b1b' : '#92400e';
 }
 
 function addPlayer() {
   const inp = document.getElementById('new-player-input');
   const name = inp.value.trim();
   if (!name) return;
-  state.players.push({ name, gender:'M', score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
+  state.players.push({ name, gender:'M', team:0, score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
   inp.value = ''; inp.focus();
   renderSetup(); save();
 }
@@ -1093,6 +1204,8 @@ function startGame() {
   state.gameMode = setupMode;
   const minP = perCourt();
   if (state.players.length < minP) { err.textContent=`Need at least ${minP} players to start.`; err.style.display='block'; return; }
+  const feas = teamFeasibility(state.players, setupCourts, setupMode);
+  if (feas && feas.level === 'error') { err.textContent = feas.msg; err.style.display='block'; return; }
   err.style.display = 'none';
   state.maxCourts = setupCourts;
   state.sessionName = document.getElementById('session-name-input').value.trim();
@@ -1137,19 +1250,120 @@ function teamGender(team) { // team: array of player objects → 'M' | 'F' | 'X'
   return 'X';
 }
 
-function smartSelectPlayers(active) {
-  if (!state.history.length) return shuffle(active);
-  const lastRound = state.history[0];
-  const justPlayed = new Set(lastRound.courts.flatMap(c => [...c.team1, ...c.team2]));
-  const rested = shuffle(active.filter(p => !justPlayed.has(p.name)));
-  const played = shuffle(active.filter(p =>  justPlayed.has(p.name)));
-  const numCourts = Math.min(Math.floor(active.length / perCourt()), state.maxCourts);
-  const numSlots  = numCourts * perCourt();
-  const everyoneHasPlayed = active.every(p => p.courtsPlayed > 0);
-  if (rested.length === numSlots && played.length > 0 && everyoneHasPlayed) {
-    played.push(rested.pop());
+// ── FIXED PAIRS & TEAMS ──────────────────────────────────────────────────────
+// One rule: teammates partner each other whenever both are on court, and never
+// face each other. A team of exactly 2 therefore behaves as a fixed pair; a
+// larger team fields whole sides, and an odd member partners outside the team.
+const MAX_TEAMS = 6;
+const TEAM_COLORS = ['#5b4fcf','#e8590c','#0d9488','#c2255c','#7048e8','#2b8a3e'];
+function teamColor(t) { return TEAM_COLORS[(t-1) % TEAM_COLORS.length]; }
+function sharesTeam(p1, p2) {
+  return p1.some(a => p2.some(b => a.team && b.team && a.team === b.team));
+}
+
+// Who may `first` partner with, given `rest` are still unpaired?
+//   - If first has unpaired teammates, it must be one of them.
+//   - Otherwise, a candidate who still has unpaired teammates normally has to pair
+//     within their own team, so they're off limits — that's what stops an unteamed
+//     player from taking one half of a pair and orphaning the other. But when a team
+//     has an ODD number left in the pool, exactly one of them has no mate to take and
+//     must pair outside, so in that case they are eligible.
+function partnerChoices(first, rest) {
+  const mates = rest.filter(p => p.team && p.team === first.team);
+  if (mates.length) return mates;
+  const left = {};
+  rest.forEach(p => { if (p.team) left[p.team] = (left[p.team] || 0) + 1; });
+  return rest.filter(p => !p.team || left[p.team] % 2 === 1);
+}
+
+// A team can hold at most one side per court; past that, its own members would
+// have to face each other.
+function teamCap(numCourts) { return state.gameMode === 'singles' ? numCourts : 2 * numCourts; }
+
+// Split a team into blocks of 2 (plus a leftover single if odd), choosing who
+// pairs with whom by fewest past partnerships so a 4+ team varies its sub-pairs.
+function teamBlocks(members) {
+  const blocks = [], pool = shuffle(members);
+  while (pool.length >= 2) {
+    const first = pool.shift();
+    let bestI = 0, bestC = Infinity;
+    for (let i=0; i<pool.length; i++) {
+      const c = getPartnerCount(first.name, pool[i].name);
+      if (c < bestC) { bestC = c; bestI = i; }
+    }
+    blocks.push([first, pool.splice(bestI,1)[0]]);
   }
-  return [...rested, ...played];
+  if (pool.length) blocks.push([pool[0]]);
+  return blocks;
+}
+
+// Chooses who plays this round, keeping teams intact. `justPlayed` (names on court
+// last round) and `hasPlayed` are passed in because the live round reads them from
+// state while the schedule simulation reads them from its own simulated context.
+function selectForRound(active, numSlots, justPlayed, hasPlayed) {
+  const singles = state.gameMode === 'singles';
+  const cap = teamCap(numSlots / perCourt());
+  const byTeam = {}, blocks = [];
+  active.forEach(p => {
+    if (p.team) (byTeam[p.team] = byTeam[p.team] || []).push(p);
+    else blocks.push([p]);
+  });
+  Object.values(byTeam).forEach(m => {
+    // Pair-blocks are a doubles idea — singles has no partner to protect, so there
+    // teammates stay independent and only the cap + never-face rule constrain them.
+    if (singles || m.length === 1) m.forEach(p => blocks.push([p]));
+    else teamBlocks(m).forEach(b => blocks.push(b));
+  });
+
+  const rested = shuffle(blocks.filter(b => b.every(p => !justPlayed.has(p.name))));
+  const played = shuffle(blocks.filter(b => b.some (p =>  justPlayed.has(p.name))));
+  // Anti-group-lock swap, as before: stops the same two groups alternating forever.
+  const restedSize = rested.reduce((n,b) => n + b.length, 0);
+  if (restedSize === numSlots && played.length > 0 && active.every(hasPlayed)) played.push(rested.pop());
+
+  // Whole blocks only — a block that won't fit the room left is skipped, never split.
+  const placed = [], spare = [], used = {};
+  let n = 0;
+  const tryPlace = b => {
+    const t = b[0].team;
+    if (n + b.length <= numSlots && (!t || (used[t]||0) + b.length <= cap)) {
+      placed.push(b); n += b.length;
+      if (t) used[t] = (used[t]||0) + b.length;
+    } else spare.push(b);
+  };
+  // Two passes in doubles. An odd-sized team's leftover member is considered only
+  // after every pair-block has had its chance: placing the leftover first spends the
+  // team's cap and can strand the team's own pair, leaving the court short.
+  const isLeftover = b => !singles && b.length === 1 && b[0].team;
+  const all = [...rested, ...played];
+  all.filter(b => !isLeftover(b)).forEach(tryPlace);
+  all.filter(isLeftover).forEach(tryPlace);
+
+  // Greedy can still strand a single slot when only pair-blocks are left over. Trade
+  // the lowest-priority placed single for the best remaining pair.
+  if (n < numSlots) {
+    const pi = spare.findIndex(b => b.length === 2 && (!b[0].team || (used[b[0].team]||0) + 2 <= cap));
+    const si = [...placed].reverse().findIndex(b => b.length === 1);
+    if (pi > -1 && si > -1) {
+      placed.splice(placed.length - 1 - si, 1);
+      placed.push(spare[pi]);
+    }
+  }
+  const toPlay = placed.flat();
+  const chosen = new Set(toPlay.map(p => p.name));
+  return { toPlay, sitting: active.filter(p => !chosen.has(p.name)) };
+}
+
+// Teams are hard constraints, so a given court count can be genuinely unfillable —
+// a 3-person team can't split across a single court, for instance. Setup blocks the
+// impossible cases up front, but mid-session edits (adding players, marking someone
+// absent) can still reach one. Drop to fewer courts rather than render a short court.
+function selectPlayable(active, maxCourts, justPlayed, hasPlayed) {
+  for (let nc = maxCourts; nc >= 1; nc--) {
+    const sel = selectForRound(active, nc * perCourt(), justPlayed, hasPlayed);
+    if (sel.toPlay.length === nc * perCourt()) return sel;
+  }
+  return { toPlay: [], sitting: active };
 }
 
 function formPairsGreedy(players) {
@@ -1157,12 +1371,15 @@ function formPairsGreedy(players) {
   const pairs = [];
   while (remaining.length >= 2) {
     const first = remaining.shift();
-    let bestIdx = 0, bestScore = Infinity;
-    for (let i=0; i<remaining.length; i++) {
-      const s = getPartnerCount(first.name, remaining[i].name);
-      if (s < bestScore) { bestScore=s; bestIdx=i; }
+    const pool = partnerChoices(first, remaining);
+    if (!pool.length) { pairs.push([first, remaining.shift()]); continue; }
+    let best = pool[0], bestScore = Infinity;
+    for (const cand of pool) {
+      const s = getPartnerCount(first.name, cand.name);
+      if (s < bestScore) { bestScore=s; best=cand; }
     }
-    pairs.push([first, remaining.splice(bestIdx,1)[0]]);
+    remaining.splice(remaining.indexOf(best), 1);
+    pairs.push([first, best]);
   }
   return pairs;
 }
@@ -1178,6 +1395,9 @@ function courtMatchScore(p1, p2) {
     const g1 = teamGender(p1), g2 = teamGender(p2);
     if (g1 !== 'X' && g2 !== 'X' && g1 !== g2) score -= 1000;
   }
+  // Teammates must never face each other. Weighted an order of magnitude above the
+  // gender penalty, so where the two genuinely conflict the explicit team wins.
+  if (sharesTeam(p1, p2)) score -= 100000;
   return score;
 }
 
@@ -1251,8 +1471,9 @@ function bestFullArrangement(players) {
     }
     const first = remaining[0];
     const rest = remaining.slice(1);
-    for (let i=0; i<rest.length; i++) {
-      const partner = rest[i];
+    // Teams are a hard filter here, so they shrink this search rather than grow it.
+    for (const partner of partnerChoices(first, rest)) {
+      const i = rest.indexOf(partner);
       pairs.push([first, partner]);
       collectPairings(rest.slice(0,i).concat(rest.slice(i+1)), pairs, repeatCost + getPartnerCount(first.name, partner.name));
       pairs.pop();
@@ -1308,11 +1529,12 @@ function generateRound(advance=true) {
   } else {
     const active = activePlayers();
     const numCourts = Math.min(Math.floor(active.length/perCourt()), state.maxCourts);
-    const numPlaying = numCourts * perCourt();
-    const prioritized = smartSelectPlayers(active);
-    const toPlay = prioritized.slice(0, numPlaying);
+    const justPlayed = state.history.length
+      ? new Set(state.history[0].courts.flatMap(c => [...c.team1, ...c.team2]))
+      : new Set();
+    const { toPlay, sitting } = selectPlayable(active, numCourts, justPlayed, p => p.courtsPlayed > 0);
     state.courts     = formBalancedCourts(toPlay);
-    state.sittingOut = prioritized.slice(numPlaying).map(p => p.name);
+    state.sittingOut = sitting.map(p => p.name);
     if (!advance) regenerateSchedule(); // reshuffled current round: upcoming rounds follow from it
   }
 
@@ -1459,20 +1681,9 @@ function simRegister(ctx, round) {
 function computeRoundSim(ctx) {
   const active = activePlayers();
   const numCourts = Math.min(Math.floor(active.length/perCourt()), state.maxCourts);
-  const numPlaying = numCourts * perCourt();
   const justPlayed = new Set((ctx.prevCourts||[]).flatMap(c => [...(c.team1||[]), ...(c.team2||[])]));
-
-  const rested = shuffle(active.filter(p => !justPlayed.has(p.name)));
-  const played  = shuffle(active.filter(p =>  justPlayed.has(p.name)));
-
-  const everyoneHasPlayed = active.every(p => (ctx.courtsPlayed[p.name]||0) > 0 || justPlayed.has(p.name));
-  if (rested.length === numPlaying && played.length > 0 && everyoneHasPlayed) {
-    played.push(rested.pop());
-  }
-
-  const prioritized = [...rested, ...played];
-  const toPlay = prioritized.slice(0, numPlaying);
-  const sitting = prioritized.slice(numPlaying);
+  const { toPlay, sitting } = selectPlayable(active, numCourts, justPlayed,
+    p => (ctx.courtsPlayed[p.name]||0) > 0 || justPlayed.has(p.name));
   return { courts: formBalancedCourts(toPlay), sittingOut: sitting.map(p => p.name) };
 }
 
@@ -1611,7 +1822,7 @@ function quickAddPlayer() {
   const name = inp.value.trim();
   if (!name) return;
   if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
-  state.players.push({ name, gender:'M', score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
+  state.players.push({ name, gender:'M', team:0, score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
   inp.value = '';
   document.getElementById('quick-add-row').style.display = 'none';
   regenerateSchedule();
@@ -1945,7 +2156,7 @@ function addPlayerMidGame() {
   const name = inp.value.trim();
   if (!name) return;
   if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
-  state.players.push({ name, gender:'M', score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
+  state.players.push({ name, gender:'M', team:0, score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
   inp.value = '';
   regenerateSchedule();
   renderPlayerListGame(); renderAbsentToggles(); renderLeaderboard(); save();
@@ -1970,6 +2181,7 @@ function renderPlayerListGame() {
     <div class="player-row">
       ${avatarHtml(p)}
       <div class="player-name">${p.name}</div>
+      ${teamChipHtml(p)}
       ${genderChipHtml(p)}
       <span class="player-score">${p.score} pts</span>
       <button class="btn-icon" onclick="removePlayerGame('${p.name}')">✕</button>
