@@ -1144,7 +1144,8 @@ function pvSetBgPhotoY(val) {
 
 async function pvGetCanvas() {
   if (pvCachedCanvas) return pvCachedCanvas;
-  pvCachedCanvas = await html2canvas(document.getElementById('pv-summary-capture'), { scale:2, backgroundColor:'#f5f5f3', useCORS:true, logging:false });
+  pvCachedCanvas = await withBakedBg(document.getElementById('pv-summary-bg-div'), pvBgPhoto, pvBgPhotoY, () =>
+    html2canvas(document.getElementById('pv-summary-capture'), { scale:2, backgroundColor:'#f5f5f3', useCORS:true, logging:false }));
   return pvCachedCanvas;
 }
 
@@ -2468,10 +2469,84 @@ function setBgPhotoY(val) {
 
 // ── EXPORT / SHARE ────────────────────────────────────────────────────────────
 
+function loadImageAsync(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+// html2canvas 1.4.1 doesn't support the CSS `filter` property at all — a background photo
+// exports with no blur whatsoever — and separately fails to render this card's
+// position:absolute + inset:0 + transform:scale + overflow:hidden background layer flush
+// with the card's edges, leaving a gap where the page background shows through instead of
+// the photo. Both are avoided by baking the blur/zoom/reposition into one flat image via
+// canvas 2D (which handles all three correctly) and handing html2canvas a plain,
+// unfiltered, untransformed background-image instead — confirmed to render correctly.
+// Only used for the exported PNG; the live on-screen card keeps using real CSS blur,
+// which an actual browser already renders correctly on its own.
+async function bakeBlurredBg(photoDataUrl, boxEl, photoY, outScale) {
+  const img = await loadImageAsync(photoDataUrl);
+  const boxW = boxEl.offsetWidth, boxH = boxEl.offsetHeight;
+  const outW = Math.max(1, Math.round(boxW * outScale)), outH = Math.max(1, Math.round(boxH * outScale));
+
+  // background-size:cover
+  const boxRatio = boxW / boxH, imgRatio = img.width / img.height;
+  let srcW, srcH, srcX, srcY;
+  if (imgRatio > boxRatio) { srcH = img.height; srcW = srcH * boxRatio; srcX = (img.width - srcW) / 2; srcY = 0; }
+  else { srcW = img.width; srcH = srcW / boxRatio; srcX = 0; srcY = (img.height - srcH) / 2; }
+
+  // transform:scale(1.3) — crop to the center 1/1.3 of the cover-fit window
+  const zoom = 1.3;
+  const zw = srcW / zoom, zh = srcH / zoom;
+  srcX += (srcW - zw) / 2; srcY += (srcH - zh) / 2;
+  srcW = zw; srcH = zh;
+
+  // translateY((50-y)*0.3%) reposition offset
+  const shiftFrac = (50 - (photoY ?? 35)) * 0.003;
+  srcY -= shiftFrac * srcH;
+  srcY = Math.max(0, Math.min(img.height - srcH, srcY));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = outW; canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+  const blurPx = 2 * outScale; // bake the 2px CSS blur, scaled for output resolution
+  ctx.filter = `blur(${blurPx.toFixed(1)}px)`;
+  // Draw oversized on all sides so the blur samples real image content at the edges
+  // instead of the canvas's transparent "outside" — without this, ctx.filter blur darkens
+  // a band around the whole image, since it partly averages in nothing.
+  const pad = blurPx * 4;
+  const padSrcX = pad * (srcW / outW), padSrcY = pad * (srcH / outH);
+  ctx.drawImage(img,
+    srcX - padSrcX, srcY - padSrcY, srcW + padSrcX*2, srcH + padSrcY*2,
+    -pad, -pad, outW + pad*2, outH + pad*2);
+  return canvas.toDataURL('image/jpeg', 0.9);
+}
+
+// Swaps in a baked background for the duration of one html2canvas capture, then restores
+// the live CSS-driven version so on-screen editing (upload, reposition) is unaffected.
+async function withBakedBg(bgDiv, photo, photoY, fn) {
+  if (!photo) return fn();
+  const baked = await bakeBlurredBg(photo, bgDiv, photoY, 2);
+  const restore = { img: bgDiv.style.backgroundImage, filter: bgDiv.style.filter, transform: bgDiv.style.transform };
+  bgDiv.style.backgroundImage = `url(${baked})`;
+  bgDiv.style.filter = 'none';
+  bgDiv.style.transform = 'none';
+  try { return await fn(); }
+  finally {
+    bgDiv.style.backgroundImage = restore.img;
+    bgDiv.style.filter = restore.filter;
+    bgDiv.style.transform = restore.transform;
+  }
+}
+
 let cachedCanvas = null;
 async function getCanvas() {
   if (cachedCanvas) return cachedCanvas;
-  cachedCanvas = await html2canvas(document.getElementById('summary-capture'), { scale:2, backgroundColor:'#f5f5f3', useCORS:true, logging:false });
+  cachedCanvas = await withBakedBg(document.getElementById('summary-bg-div'), state.bgPhoto, state.bgPhotoY, () =>
+    html2canvas(document.getElementById('summary-capture'), { scale:2, backgroundColor:'#f5f5f3', useCORS:true, logging:false }));
   return cachedCanvas;
 }
 
