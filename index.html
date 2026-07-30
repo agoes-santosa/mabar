@@ -492,7 +492,59 @@
     </div>
     <div id="pv-loading" style="text-align:center;padding:3rem 0;color:#bbb;font-size:15px">Loading session...</div>
     <div id="pv-content"></div>
-    <div id="pv-finished"></div>
+    <div id="pv-finished">
+      <div id="pv-summary-capture" style="background:#f5f5f3;padding:4px 0 8px">
+        <div class="summary-card" id="pv-summary-card-el">
+          <div id="pv-summary-bg-div" style="display:none;position:absolute;inset:0;border-radius:16px;background-size:cover;background-position:center center;background-repeat:no-repeat;filter:blur(2px);transform:scale(1.3)"></div>
+          <div id="pv-summary-bg-overlay" class="summary-bg-overlay" style="display:none"></div>
+          <div class="summary-card-inner">
+            <div style="text-align:center;margin-bottom:1rem">
+              <div style="font-size:24px">🎾</div>
+              <div class="session-title-display" id="pv-summary-session-name">Session complete</div>
+              <div class="session-date" id="pv-summary-date"></div>
+            </div>
+            <div style="display:flex;justify-content:center;gap:2rem;margin-bottom:1.5rem">
+              <div class="summary-stat"><div class="summary-stat-val" id="pv-sum-rounds">0</div><div class="summary-stat-label">Rounds</div></div>
+              <div class="summary-stat"><div class="summary-stat-val" id="pv-sum-players">0</div><div class="summary-stat-label">Players</div></div>
+              <div class="summary-stat"><div class="summary-stat-val" id="pv-sum-points">0</div><div class="summary-stat-label">Total pts</div></div>
+            </div>
+            <div class="podium" id="pv-summary-podium"></div>
+            <div style="height:0.5px;background:#f0f0ec;margin:1rem 0"></div>
+            <div id="pv-summary-full-board"></div>
+            <div style="text-align:center;margin-top:1rem;font-size:10px;color:#ccc;letter-spacing:.05em">Tennis Mabar App by Agoes Santosa</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:4px;margin-bottom:.75rem">
+        <button class="sort-btn active" id="pv-sort-pts-btn" onclick="setPlayerViewSort('points')">Raw Pts</button>
+        <button class="sort-btn" id="pv-sort-wr-btn" onclick="setPlayerViewSort('winrate')">Win %</button>
+        <button class="sort-btn" id="pv-sort-pp-btn" onclick="setPlayerViewSort('ptspct')">Pts %</button>
+        <button class="sort-btn" id="pv-sort-mp-btn" onclick="setPlayerViewSort('matchpts')">Match Pts</button>
+      </div>
+      <div class="card" style="margin-bottom:.875rem">
+        <div class="card-title">Background photo</div>
+        <button class="bg-photo-btn" onclick="document.getElementById('pv-bg-file-input').click()">
+          <img id="pv-bg-preview-thumb" class="bg-preview" style="display:none" alt="preview" />
+          <span id="pv-bg-photo-label">📷  Add a background photo</span>
+        </button>
+        <div id="pv-bg-remove-row" style="display:none;margin-top:10px">
+          <button class="btn btn-secondary btn-sm" onclick="pvRemoveBgPhoto()">Remove photo</button>
+        </div>
+        <div id="pv-bg-position-row" style="display:none;margin-top:12px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:12px;color:#888;flex-shrink:0">Reposition ↕</span>
+            <input type="range" min="0" max="100" value="35" id="pv-bg-position-slider"
+              oninput="pvSetBgPhotoY(this.value)"
+              style="flex:1;accent-color:#5b4fcf;cursor:pointer" />
+          </div>
+        </div>
+      </div>
+      <div class="export-actions" style="margin-bottom:.5rem">
+        <button class="btn btn-export" style="flex:1" onclick="pvExportImage(event)">Download image</button>
+        <button class="btn btn-share" id="pv-btn-share" style="flex:1;display:none" onclick="pvShareImage(event)">Share</button>
+      </div>
+      <div style="height:.5rem"></div>
+    </div>
     <button class="btn btn-primary btn-full" id="pv-takeover-btn" style="display:none;margin-top:.5rem" onclick="openTakeover()">🔑 Take over as referee</button>
     <div style="height:2rem"></div>
   </div>
@@ -531,6 +583,7 @@
 </div>
 
 <input type="file" id="bg-file-input" accept="image/*" style="display:none" />
+<input type="file" id="pv-bg-file-input" accept="image/*" style="display:none" />
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -859,7 +912,7 @@ function initPlayerView(code) {
       document.getElementById('pv-finished').style.display = 'block';
       document.getElementById('phase-badge').className = 'badge badge-setup';
       document.getElementById('phase-badge').textContent = 'Finished';
-      renderPlayerSummary(s);
+      renderPlayerSummary(s, data.updatedAt && data.updatedAt.toDate ? data.updatedAt.toDate() : null);
     } else {
       document.getElementById('pv-content').style.display = 'block';
       document.getElementById('pv-finished').style.display = 'none';
@@ -969,24 +1022,50 @@ let pvSortMode = 'points';
 
 function setPlayerViewSort(mode) {
   pvSortMode = mode;
-  if (pvSession) renderPlayerSummary(pvSession);
+  document.getElementById('pv-sort-pts-btn')?.classList.toggle('active', mode==='points');
+  document.getElementById('pv-sort-wr-btn')?.classList.toggle('active', mode==='winrate');
+  document.getElementById('pv-sort-pp-btn')?.classList.toggle('active', mode==='ptspct');
+  document.getElementById('pv-sort-mp-btn')?.classList.toggle('active', mode==='matchpts');
+  pvCachedCanvas = null;
+  renderPvSummaryBoard();
 }
 
-function renderPlayerSummary(s) {
+// Mirrors the real Summary screen's structure/CSS exactly (renderSummary +
+// renderSummaryBoard), so a session opened from Live/History looks identical to
+// finishing it live — same sort-button placement, same background photo & export
+// controls. Score editing is deliberately NOT mirrored here: that stays gated behind
+// taking over as referee, same as any other write to someone else's session.
+function renderPlayerSummary(s, when) {
   pvSession = s;
   const players = derivePlayerStats(s);
+
+  document.getElementById('pv-summary-session-name').textContent = s.sessionName || 'Session complete';
+  document.getElementById('pv-summary-date').textContent = when
+    ? when.toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'}) : '';
+  document.getElementById('pv-sum-rounds').textContent = (s.history || []).length;
+  document.getElementById('pv-sum-players').textContent = players.length;
+  document.getElementById('pv-sum-points').textContent = players.reduce((t,p) => t+(p.score||0), 0);
+
+  renderPvSummaryBoard();
+  pvApplyBgPhoto();
+  if (navigator.share || navigator.canShare) document.getElementById('pv-btn-share').style.display = 'flex';
+}
+
+function renderPvSummaryBoard() {
+  if (!pvSession) return;
+  const players = derivePlayerStats(pvSession);
   const sorted = sortPlayersBy(pvSortMode, players);
   const metric = p => pvSortMode==='winrate' ? winRatePct(p)
                     : pvSortMode==='ptspct' ? pointPct(p)
                     : pvSortMode==='matchpts' ? matchPtsDisplay(p)
                     : (p.score || 0);
 
-  const podiumOrder = [sorted[1], sorted[0], sorted[2]].filter(Boolean);
   const avCls = ['podium-avatar-2', 'podium-avatar-1', 'podium-avatar-3'];
   const blCls = ['podium-block-2', 'podium-block-1', 'podium-block-3'];
   const medals = ['🥈', '🥇', '🥉'];
+  const podiumOrder = [sorted[1], sorted[0], sorted[2]].filter(Boolean);
 
-  const podiumHtml = podiumOrder.map((p, i) => `
+  document.getElementById('pv-summary-podium').innerHTML = podiumOrder.map((p, i) => `
     <div class="podium-slot">
       <div class="podium-avatar ${avCls[i]}">${pvInitials(p.name)}</div>
       <div class="podium-name">${p.name}</div>
@@ -995,7 +1074,7 @@ function renderPlayerSummary(s) {
       <div class="podium-block ${blCls[i]}">${medals[i]}</div>
     </div>`).join('');
 
-  const listHtml = sorted.slice(3).map((p, i) => `
+  document.getElementById('pv-summary-full-board').innerHTML = sorted.slice(3).map((p, i) => `
     <div class="summary-row">
       <span class="medal" style="font-size:12px;font-weight:700;color:#bbb">${i + 4}</span>
       <div class="sum-avatar">${pvInitials(p.name)}</div>
@@ -1003,31 +1082,104 @@ function renderPlayerSummary(s) {
       <span style="font-size:12px;color:#aaa;margin-right:8px">${p.courtsPlayed || 0} played</span>
       <span style="font-size:15px;font-weight:700">${metric(p)}</span>
     </div>`).join('');
+}
 
-  const btn = (mode, label) =>
-    `<button class="sort-btn${pvSortMode===mode?' active':''}" onclick="setPlayerViewSort('${mode}')">${label}</button>`;
+// ── HISTORY/LIVE VIEWER: background photo + export ───────────────────────────
+// Deliberately local to this page view only — never synced or persisted, same as
+// how the real bgPhoto already works (stripped before every Firestore write). So
+// picking a photo here to decorate/export a past session behaves exactly like it
+// already does on the real Summary screen: a one-time local decoration, not data.
+let pvBgPhoto = null, pvBgPhotoY = 35, pvCachedCanvas = null;
 
-  document.getElementById('pv-finished').innerHTML = `
-    <div class="summary-card">
-      <div class="summary-card-inner">
-        <div style="text-align:center;margin-bottom:1rem">
-          <div style="font-size:24px">🎾</div>
-          <div class="session-title-display">${s.sessionName || 'Session Complete'}</div>
-        </div>
-        <div style="display:flex;justify-content:center;gap:2rem;margin-bottom:1.5rem">
-          <div class="summary-stat"><div class="summary-stat-val">${(s.history || []).length}</div><div class="summary-stat-label">Rounds</div></div>
-          <div class="summary-stat"><div class="summary-stat-val">${(s.players||[]).length}</div><div class="summary-stat-label">Players</div></div>
-          <div class="summary-stat"><div class="summary-stat-val">${players.reduce((t,p)=>t+(p.score||0),0)}</div><div class="summary-stat-label">Total pts</div></div>
-        </div>
-        <div class="sort-toggle-row" style="justify-content:center;margin-bottom:1rem">
-          ${btn('points','Raw Pts')}${btn('winrate','Win %')}${btn('ptspct','Pts %')}${btn('matchpts','Match Pts')}
-        </div>
-        <div class="podium">${podiumHtml}</div>
-        <div style="height:0.5px;background:#f0f0ec;margin:1rem 0"></div>
-        ${listHtml}
-        <div style="text-align:center;margin-top:1rem;font-size:10px;color:#ccc;letter-spacing:.05em">Tennis Mabar App by Agoes Santosa</div>
-      </div>
-    </div>`;
+function pvApplyBgPhoto() {
+  const card = document.getElementById('pv-summary-card-el');
+  const bgDiv = document.getElementById('pv-summary-bg-div');
+  const overlay = document.getElementById('pv-summary-bg-overlay');
+  const thumb = document.getElementById('pv-bg-preview-thumb');
+  const label = document.getElementById('pv-bg-photo-label');
+  const removeRow = document.getElementById('pv-bg-remove-row');
+  const posRow = document.getElementById('pv-bg-position-row');
+  const slider = document.getElementById('pv-bg-position-slider');
+  if (pvBgPhoto) {
+    bgDiv.style.backgroundImage = `url(${pvBgPhoto})`; bgDiv.style.transform = `scale(1.3) translateY(${(50-pvBgPhotoY)*0.3}%)`; bgDiv.style.display = 'block';
+    overlay.style.display = 'block'; card.classList.add('has-bg');
+    thumb.src = pvBgPhoto; thumb.style.display = 'block';
+    label.textContent = 'Change background photo'; removeRow.style.display = 'block';
+    posRow.style.display = 'block'; if (slider) slider.value = pvBgPhotoY;
+  } else {
+    bgDiv.style.backgroundImage = ''; bgDiv.style.display = 'none';
+    overlay.style.display = 'none'; card.classList.remove('has-bg');
+    thumb.style.display = 'none';
+    label.textContent = '📷  Add a background photo'; removeRow.style.display = 'none';
+    posRow.style.display = 'none';
+  }
+}
+
+document.getElementById('pv-bg-file-input').addEventListener('change', function() {
+  const file = this.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxW = 1200, scale = Math.min(1, maxW/img.width);
+      canvas.width = Math.round(img.width*scale); canvas.height = Math.round(img.height*scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      pvBgPhoto = canvas.toDataURL('image/jpeg', 0.85);
+      pvCachedCanvas = null; pvApplyBgPhoto();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+function pvRemoveBgPhoto() { pvBgPhoto = null; pvCachedCanvas = null; pvApplyBgPhoto(); }
+
+function pvSetBgPhotoY(val) {
+  pvBgPhotoY = parseInt(val);
+  const bgDiv = document.getElementById('pv-summary-bg-div');
+  if (bgDiv) bgDiv.style.transform = `scale(1.3) translateY(${(50-pvBgPhotoY)*0.3}%)`;
+  pvCachedCanvas = null;
+}
+
+async function pvGetCanvas() {
+  if (pvCachedCanvas) return pvCachedCanvas;
+  pvCachedCanvas = await html2canvas(document.getElementById('pv-summary-capture'), { scale:2, backgroundColor:'#f5f5f3', useCORS:true, logging:false });
+  return pvCachedCanvas;
+}
+
+async function pvExportImage(e) {
+  const btn = e.target; btn.textContent = 'Generating…'; btn.disabled = true;
+  try {
+    const canvas = await pvGetCanvas();
+    const link = document.createElement('a');
+    link.download = ((pvSession && pvSession.sessionName) || 'mabar').replace(/\s+/g,'-').toLowerCase()+'-results.png';
+    link.href = canvas.toDataURL('image/png'); link.click();
+  } catch(err) { alert('Could not generate image: '+err.message); }
+  btn.textContent = 'Download image'; btn.disabled = false;
+}
+
+async function pvShareImage(e) {
+  const btn = e.target; btn.textContent = 'Preparing…'; btn.disabled = true;
+  try {
+    const canvas = await pvGetCanvas();
+    canvas.toBlob(async blob => {
+      const file = new File([blob], 'mabar-results.png', {type:'image/png'});
+      const title = ((pvSession && pvSession.sessionName) || 'Tennis Mabar')+' Results';
+      if (navigator.canShare && navigator.canShare({files:[file]})) {
+        await navigator.share({files:[file], title});
+      } else {
+        await navigator.share({title, text: pvBuildShareText()});
+      }
+      btn.textContent = 'Share'; btn.disabled = false;
+    });
+  } catch(err) { btn.textContent = 'Share'; btn.disabled = false; }
+}
+
+function pvBuildShareText() {
+  if (!pvSession) return '';
+  const sorted = sortPlayersBy(pvSortMode, derivePlayerStats(pvSession));
+  return `🎾 ${pvSession.sessionName||'Tennis Mabar'} Results\n`+sorted.map((p,i)=>`${i+1}. ${p.name} — ${p.score} pts`).join('\n');
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
