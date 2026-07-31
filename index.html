@@ -160,7 +160,9 @@
   .mode-btn .mode-sub { font-size: 11px; font-weight: 500; color: #aaa; }
   .mode-btn.active .mode-sub { color: #8d84e0; }
 
-  .court-counter { display: flex; align-items: center; gap: 16px; }
+  .setup-2col { display: flex; gap: 10px; }
+  .setup-2col > div { flex: 1; min-width: 0; }
+  .court-counter { display: flex; align-items: center; gap: 10px; }
   .counter-btn { width: 44px; height: 44px; border-radius: 50%; border: 0.5px solid #d0d0cc; background: #fff; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #333; }
   .counter-val { font-size: 28px; font-weight: 700; min-width: 32px; text-align: center; }
 
@@ -280,12 +282,12 @@
   .pd-name { font-size: 19px; font-weight: 800; }
   .pd-rating { font-size: 30px; font-weight: 800; margin-top: 4px; }
   .pd-sub { font-size: 12px; color: #999; margin-top: 3px; }
-  .pd-h2h { display: flex; align-items: center; gap: 10px; background: #fff; border: 0.5px solid #e5e5e0; border-radius: 10px; padding: .6rem .75rem; margin-bottom: .4rem; }
-  .pd-h2h-name { flex: 1; font-size: 14px; font-weight: 600; min-width: 0; }
-  .pd-h2h-rec { font-size: 12px; color: #999; flex-shrink: 0; }
-  .pd-h2h-pct { font-size: 14px; font-weight: 800; min-width: 42px; text-align: right; flex-shrink: 0; }
-  .pd-bar { height: 4px; border-radius: 3px; background: #f0f0ec; overflow: hidden; margin-top: 5px; }
-  .pd-bar-fill { height: 100%; background: #5b4fcf; }
+  .pd-h2h-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: .4rem; }
+  .pd-h2h-cell { display: flex; align-items: center; justify-content: space-between; gap: 6px; background: #fff; border: 0.5px solid #e5e5e0; border-radius: 10px; padding: .55rem .65rem; }
+  .pd-h2h-cell-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .pd-h2h-cell-pct { font-size: 13px; font-weight: 800; flex-shrink: 0; }
+  .pd-h2h-cell-pct.win { color: #16a34a; }
+  .pd-h2h-cell-pct.loss { color: #dc2626; }
   .pd-match { background: #fff; border: 0.5px solid #e5e5e0; border-radius: 10px; padding: .6rem .75rem; margin-bottom: .4rem; }
   .pd-match-top { display: flex; align-items: center; gap: 8px; font-size: 13px; }
   .pd-res { font-size: 10.5px; font-weight: 800; border-radius: 5px; padding: 2px 6px; flex-shrink: 0; }
@@ -412,19 +414,23 @@
       <input type="text" id="session-name-input" placeholder="e.g. Saturday Morning" />
     </div>
     <div class="card">
-      <button class="rated-btn" id="rated-btn" onclick="toggleRated()">
-        <span id="rated-btn-label">🏅 Counts toward standings</span>
-      </button>
-      <div class="rated-sub" id="rated-sub">Results from this session will affect monthly ratings.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">Number of courts</div>
-      <div class="court-counter">
-        <button class="counter-btn" onclick="changeCourts(-1)">−</button>
-        <span class="counter-val" id="courts-count-display">1</span>
-        <button class="counter-btn" onclick="changeCourts(1)">+</button>
-        <span style="font-size:14px;color:#888">available</span>
+      <div class="setup-2col">
+        <div>
+          <div class="card-title">Courts</div>
+          <div class="court-counter">
+            <button class="counter-btn" onclick="changeCourts(-1)">−</button>
+            <span class="counter-val" id="courts-count-display">1</span>
+            <button class="counter-btn" onclick="changeCourts(1)">+</button>
+          </div>
+        </div>
+        <div>
+          <div class="card-title">Standings</div>
+          <button class="rated-btn" id="rated-btn" onclick="toggleRated()">
+            <span id="rated-btn-label">🏅 Rated</span>
+          </button>
+        </div>
       </div>
+      <div class="rated-sub" id="rated-sub">Results from this session will affect monthly ratings.</div>
     </div>
     <div class="card">
       <div class="card-title">Players</div>
@@ -721,6 +727,21 @@
   </div>
 </div>
 
+<div id="rating-explain-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;z-index:220;padding:1.5rem">
+  <div style="background:#fff;border-radius:16px;max-width:380px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.15);overflow:hidden">
+    <div class="rm-head">
+      <div class="rm-title">How ratings work</div>
+      <button class="icon-btn" onclick="closeRatingExplain()" aria-label="Close">✕</button>
+    </div>
+    <div style="padding:1.1rem;font-size:13.5px;color:#555;line-height:1.65">
+      <p style="margin-bottom:.75rem">Ratings use <b>Elo</b> — the same system chess uses. Everyone starts at 1000.</p>
+      <p style="margin-bottom:.75rem">Before each match, both sides' ratings predict who <i>should</i> win. Beat a stronger opponent and you gain more; lose to a weaker one and you lose more. So it rewards playing well against tough opponents, not just piling up wins against weak ones — Raw Points or Win % can't tell those apart, but rating does.</p>
+      <p style="margin-bottom:.75rem">Every point gained by one player is lost by another, so the rating pool never inflates — it just moves around as form changes.</p>
+      <p style="margin:0">New players are marked <b>provisional</b> for their first <span id="rating-explain-min"></span> matches — a rating needs a few games before it means much.</p>
+    </div>
+  </div>
+</div>
+
 <div class="sticky-actions" id="sticky-bar" style="display:none">
   <div class="sticky-inner">
     <button class="btn btn-primary" style="flex:1" onclick="submitRound()">Save &amp; next round</button>
@@ -774,7 +795,7 @@ function renderRatedToggle() {
   const sub = document.getElementById('rated-sub');
   if (!btn) return;
   btn.classList.toggle('casual', !setupRated);
-  label.textContent = setupRated ? '🏅 Counts toward standings' : '😎 Casual — not rated';
+  label.textContent = setupRated ? '🏅 Rated' : '😎 Casual';
   sub.textContent = setupRated
     ? 'Results from this session will affect monthly ratings.'
     : 'Still saved, shared and listed in history — it just won\'t affect anyone\'s rating.';
@@ -3752,12 +3773,22 @@ function renderStandings() {
     +   '<button class="ms-picker-btn" onclick="stepStandingsMonth(-1)"' + (standingsIdx <= 0 ? ' disabled' : '') + '>›</button>'
     + '</div>'
     + '<div class="ms-note">Ranked by rating, which accounts for who you played with and against — not just how often you won. '
-    +   'The arrow is the change during this month. Needs ' + RATED_MIN_MATCHES + '+ matches in the month to be ranked.</div>'
+    +   'The arrow is the change during this month. Needs ' + RATED_MIN_MATCHES + '+ matches in the month to be ranked.'
+    +   '<div><button class="roster-manage-link" onclick="openRatingExplain()">Explanation on ratings</button></div>'
+    + '</div>'
     + (ranked.length ? ranked.map(function(r,i){ return row(r,i,true); }).join('')
                      : '<div class="list-empty">Nobody reached ' + RATED_MIN_MATCHES + ' matches this month yet.</div>')
     + (unranked.length
         ? '<div class="ms-group">Not enough matches to rank</div>' + unranked.map(function(r){ return row(r,0,false); }).join('')
         : '');
+}
+
+function openRatingExplain() {
+  document.getElementById('rating-explain-min').textContent = RATED_MIN_MATCHES;
+  document.getElementById('rating-explain-overlay').style.display = 'flex';
+}
+function closeRatingExplain() {
+  document.getElementById('rating-explain-overlay').style.display = 'none';
 }
 
 function openStandingsPlayer(name) { standingsPlayer = name; renderStandingsPlayer(); window.scrollTo({top:0}); }
@@ -3804,14 +3835,13 @@ function renderStandingsPlayer() {
     + '</div>'
 
     + '<div class="ms-group" style="padding-top:0">Record against each opponent</div>'
-    + (h2h.length ? h2h.map(function(f){
-        return '<div class="pd-h2h">'
-          + '<div class="pd-h2h-name">' + esc(f.name)
-          +   '<div class="pd-bar"><div class="pd-bar-fill" style="width:' + f.pct + '%"></div></div></div>'
-          + '<div class="pd-h2h-rec">' + f.w + 'W ' + f.l + 'L' + (f.t? ' ' + f.t + 'T' : '') + '</div>'
-          + '<div class="pd-h2h-pct">' + f.pct + '%</div>'
+    + (h2h.length ? '<div class="pd-h2h-grid">' + h2h.map(function(f){
+        const pctCls = f.pct > 50 ? 'win' : f.pct < 50 ? 'loss' : '';
+        return '<div class="pd-h2h-cell">'
+          + '<span class="pd-h2h-cell-name">' + esc(f.name) + '</span>'
+          + '<span class="pd-h2h-cell-pct ' + pctCls + '">' + f.pct + '%</span>'
           + '</div>';
-      }).join('') : '<div class="roster-empty">No opponents recorded.</div>')
+      }).join('') + '</div>' : '<div class="roster-empty">No opponents recorded.</div>')
 
     + '<div class="ms-group">Match history this month</div>'
     + (mine.length ? mine.slice().reverse().map(function(x){
