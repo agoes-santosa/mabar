@@ -689,6 +689,9 @@
         </div>
         <div id="pv-history-list" style="display:none;margin-top:.75rem"></div>
       </div>
+      <div style="text-align:center">
+        <button class="roster-manage-link" onclick="openDeleteSession()">Delete session</button>
+      </div>
       <div style="height:.5rem"></div>
     </div>
     <button class="btn btn-primary btn-full" id="pv-takeover-btn" style="display:none;margin-top:.5rem" onclick="openTakeover()">🔑 Take over as referee</button>
@@ -705,6 +708,18 @@
     <div id="takeover-error" style="display:none;color:#dc2626;font-size:13px;margin-top:.5rem;line-height:1.5"></div>
     <button class="btn btn-primary btn-full" style="margin-top:.875rem" id="takeover-submit" onclick="submitTakeover()">Take control</button>
     <button style="display:block;width:100%;text-align:center;margin-top:.75rem;font-size:13px;color:#888;background:none;border:none;cursor:pointer;padding:6px" onclick="closeTakeover()">Cancel</button>
+  </div>
+</div>
+
+<div id="delete-session-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;z-index:200;padding:1.5rem">
+  <div style="background:#fff;border-radius:16px;padding:1.5rem 1.35rem;max-width:330px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.15)">
+    <div style="width:44px;height:44px;border-radius:50%;background:#fee2e2;color:#991b1b;display:flex;align-items:center;justify-content:center;font-size:19px;margin-bottom:.75rem">🗑️</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Delete this session</div>
+    <div style="font-size:13px;color:#888;line-height:1.55;margin-bottom:1rem">This permanently deletes the session — scores, round history, and its contribution to every player's rating. <b style="color:#991b1b">This can't be undone.</b> Enter the referee PIN to confirm.</div>
+    <input type="password" inputmode="numeric" maxlength="4" id="delete-session-pin" placeholder="• • • •" style="text-align:center;letter-spacing:.3em;font-size:20px" onkeydown="if(event.key==='Enter')submitDeleteSession()" />
+    <div id="delete-session-error" style="display:none;color:#dc2626;font-size:13px;margin-top:.5rem;line-height:1.5"></div>
+    <button class="btn btn-danger btn-full" style="margin-top:.875rem" id="delete-session-submit" onclick="submitDeleteSession()">Delete session</button>
+    <button style="display:block;width:100%;text-align:center;margin-top:.75rem;font-size:13px;color:#888;background:none;border:none;cursor:pointer;padding:6px" onclick="closeDeleteSession()">Cancel</button>
   </div>
 </div>
 
@@ -1077,6 +1092,54 @@ async function submitTakeover() {
   }
   // Session adopted locally — reload without ?code= so it opens as the active game.
   location.href = location.href.split('?')[0].replace(/\/index\.html$/, '/');
+}
+
+function openDeleteSession() {
+  document.getElementById('delete-session-overlay').style.display = 'flex';
+  document.getElementById('delete-session-error').style.display = 'none';
+  document.getElementById('delete-session-pin').value = '';
+  setTimeout(() => document.getElementById('delete-session-pin').focus(), 50);
+}
+
+function closeDeleteSession() { document.getElementById('delete-session-overlay').style.display = 'none'; }
+
+// Same trust model as claimBaton above: the PIN is checked client-side against
+// whatever's currently in Firestore — a deterrent against an accidental tap on an
+// irreversible action, not real security, the same honest trade-off referee handover
+// and Manage roster already make. Deliberately as strict as claimBaton, not looser:
+// deleting is more dangerous than taking control, so a PIN-less legacy session (no
+// referee handover PIN was ever set) can't be deleted here either.
+async function deleteSessionByPin(code, pin) {
+  const ref = db.collection('sessions').doc(code);
+  const doc = await ref.get();
+  if (!doc.exists) return { ok: false, msg: 'Session not found — it may already be deleted.' };
+  const d = doc.data();
+  if (!d.refPin) return { ok: false, msg: 'This session was created before referee handover existed, so it has no PIN and can\'t be deleted here.' };
+  if (String(d.refPin) !== String(pin).trim()) return { ok: false, msg: 'That PIN doesn\'t match.' };
+  await ref.delete();
+  return { ok: true };
+}
+
+async function submitDeleteSession() {
+  const err = document.getElementById('delete-session-error');
+  const btn = document.getElementById('delete-session-submit');
+  const pin = document.getElementById('delete-session-pin').value;
+  err.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Deleting…';
+  let res;
+  try {
+    res = await deleteSessionByPin(pvCode, pin);
+  } catch(e) {
+    res = { ok: false, msg: 'Could not delete — check your connection.' };
+  }
+  if (!res.ok) {
+    err.textContent = res.msg;
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Delete session';
+    return;
+  }
+  closeDeleteSession();
+  showHistory();
 }
 
 // ── PLAYER VIEW ───────────────────────────────────────────────────────────────
