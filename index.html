@@ -183,7 +183,7 @@
   .summary-stat { text-align: center; }
   .summary-stat-val { font-size: 28px; font-weight: 700; }
   .summary-stat-label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
-  .summary-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid #f0f0ec; }
+  .summary-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 0.5px solid #f0f0ec; }
   .summary-row:last-child { border-bottom: none; }
   .medal { font-size: 16px; min-width: 22px; text-align: center; }
   .export-actions { display: flex; gap: 8px; }
@@ -271,7 +271,9 @@
   .casual-tag { font-size: 10px; font-weight: 700; color: #777; background: #f0f0ec; border-radius: 5px; padding: 2px 6px; margin-left: 6px; vertical-align: 1px; }
 
   /* Session rating column */
-  .sum-rating { font-size: 12px; font-weight: 700; color: #5b4fcf; margin-left: 8px; flex-shrink: 0; }
+  .sum-played { font-size: 11.5px; color: #aaa; width: 44px; text-align: center; flex-shrink: 0; white-space: nowrap; }
+  .sum-pct { font-size: 14.5px; font-weight: 700; width: 38px; text-align: center; flex-shrink: 0; }
+  .sum-rating { font-size: 11.5px; font-weight: 700; color: #5b4fcf; width: 60px; text-align: right; flex-shrink: 0; }
   .sum-rating .rd { font-size: 10.5px; font-weight: 700; margin-left: 3px; }
   .rd.up { color: #16a34a; } .rd.down { color: #dc2626; } .rd.flat { color: #bbb; }
   .summary-card.has-bg .sum-rating { color: #c7c2f5; }
@@ -291,6 +293,14 @@
   .pd-h2h-cell-pct { font-size: 13px; font-weight: 800; flex-shrink: 0; }
   .pd-h2h-cell-pct.win { color: #16a34a; }
   .pd-h2h-cell-pct.loss { color: #dc2626; }
+  .pd-pairs-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: .4rem; }
+  .pd-pairs-col-title { font-size: 11px; font-weight: 700; color: #888; margin-bottom: 6px; }
+  .pd-pairs-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; background: #fff; border: 0.5px solid #e5e5e0; border-radius: 10px; padding: .5rem .6rem; margin-bottom: 6px; }
+  .pd-pairs-row:last-child { margin-bottom: 0; }
+  .pd-pairs-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .pd-pairs-pct { font-size: 12.5px; font-weight: 800; flex-shrink: 0; margin-left: 6px; }
+  .pd-pairs-pct.win { color: #16a34a; }
+  .pd-pairs-pct.loss { color: #dc2626; }
   .pd-match { background: #fff; border: 0.5px solid #e5e5e0; border-radius: 10px; padding: .6rem .75rem; margin-bottom: .4rem; }
   .pd-match-top { display: flex; align-items: center; gap: 8px; font-size: 13px; }
   .pd-res { font-size: 10.5px; font-weight: 800; border-radius: 5px; padding: 2px 6px; flex-shrink: 0; }
@@ -671,6 +681,13 @@
       <div class="export-actions" style="margin-bottom:.5rem">
         <button class="btn btn-export" style="flex:1" onclick="pvExportImage(event)">Download image</button>
         <button class="btn btn-share" id="pv-btn-share" style="flex:1;display:none" onclick="pvShareImage(event)">Share</button>
+      </div>
+      <div class="card" style="margin-bottom:.875rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="pvToggleHistory()">
+          <span class="card-title" style="margin-bottom:0">Round history</span>
+          <span id="pv-history-chevron" style="color:#888;font-size:11px">▾</span>
+        </div>
+        <div id="pv-history-list" style="display:none;margin-top:.75rem"></div>
       </div>
       <div style="height:.5rem"></div>
     </div>
@@ -1234,6 +1251,13 @@ function renderPlayerSummary(s, when) {
   pvSession = s;
   const players = derivePlayerStats(s);
 
+  // Collapse any round history left open from a previously viewed session, so its
+  // stale rounds can't flash before the user re-expands it for this one.
+  const histList = document.getElementById('pv-history-list');
+  if (histList) { histList.style.display = 'none'; histList.innerHTML = ''; }
+  const histChevron = document.getElementById('pv-history-chevron');
+  if (histChevron) histChevron.textContent = '▾';
+
   document.getElementById('pv-summary-session-name').textContent = s.sessionName || 'Session complete';
   document.getElementById('pv-summary-date').textContent = when
     ? when.toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'}) : '';
@@ -1275,10 +1299,38 @@ function renderPvSummaryBoard() {
     <div class="summary-row">
       <span class="medal" style="font-size:12px;font-weight:700;color:#bbb">${i + 4}</span>
       <div class="sum-avatar">${pvInitials(p.name)}</div>
-      <span style="flex:1;font-size:14px">${p.name}</span>
-      <span style="font-size:12px;color:#aaa;margin-right:8px">${p.courtsPlayed || 0} played</span>
-      <span style="font-size:15px;font-weight:700">${metric(p)}</span>
+      <span style="flex:1;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>
+      <span class="sum-played">${p.courtsPlayed || 0} played</span>
+      <span class="sum-pct">${metric(p)}</span>
       ${sessionRatingHtml(p.name)}
+    </div>`).join('');
+}
+
+// Collapsed by default so the screen stays compact; read-only always — unlike the
+// live Summary's own round history, scores here already fed into everyone's rating,
+// so editing is deliberately not offered (same reasoning as the score-editing note
+// on renderPlayerSummary above). Lives outside #pv-summary-capture, so it's naturally
+// excluded from the exported/shared image, same as the live Summary's version.
+function pvToggleHistory() {
+  const list = document.getElementById('pv-history-list');
+  const chevron = document.getElementById('pv-history-chevron');
+  const opening = list.style.display === 'none';
+  list.style.display = opening ? 'block' : 'none';
+  if (chevron) chevron.textContent = opening ? '▴' : '▾';
+  if (opening) renderPvHistory();
+}
+
+function renderPvHistory() {
+  const list = document.getElementById('pv-history-list');
+  if (!pvSession) return;
+  const hist = pvSession.history || [];
+  if (!hist.length) { list.innerHTML = '<div class="roster-empty">No rounds recorded.</div>'; return; }
+  list.innerHTML = hist.map(h => `<div class="history-block">
+      <div style="font-size:11px;font-weight:700;color:#5b4fcf;margin-bottom:6px">Round ${h.round}</div>
+      ${(h.courts || []).map((c, ci) =>
+        `<div class="history-item">Court ${ci + 1}: ${c.team1.join(' & ')} ${c.score1 || 0}–${c.score2 || 0} ${c.team2.join(' & ')}</div>`
+      ).join('')}
+      ${h.sittingOut && h.sittingOut.length ? `<div style="font-size:11px;color:#bbb;margin-top:3px">Resting: ${h.sittingOut.join(', ')}</div>` : ''}
     </div>`).join('');
 }
 
@@ -1291,6 +1343,7 @@ let pvBgPhoto = null, pvBgPhotoY = 35, pvCachedCanvas = null;
 
 function pvApplyBgPhoto() {
   const card = document.getElementById('pv-summary-card-el');
+  const wrap = document.getElementById('pv-summary-capture');
   const bgDiv = document.getElementById('pv-summary-bg-div');
   const overlay = document.getElementById('pv-summary-bg-overlay');
   const thumb = document.getElementById('pv-bg-preview-thumb');
@@ -1301,12 +1354,19 @@ function pvApplyBgPhoto() {
   if (pvBgPhoto) {
     bgDiv.style.backgroundImage = `url(${pvBgPhoto})`; bgDiv.style.transform = `scale(1.3) translateY(${(50-pvBgPhotoY)*0.3}%)`; bgDiv.style.display = 'block';
     overlay.style.display = 'block'; card.classList.add('has-bg');
+    // The wrapper's own light padding+background were designed to frame a plain white
+    // card — against a dark photo card they instead read as a stray light border: full
+    // padding at the straight edges, and (once that's removed) still a sliver at each
+    // rounded corner, where the card's curve doesn't cover the wrapper's own rectangular
+    // background sitting directly behind it. Going full-bleed and dark fixes both.
+    if (wrap) { wrap.style.padding = '0'; wrap.style.background = '#000'; }
     thumb.src = pvBgPhoto; thumb.style.display = 'block';
     label.textContent = 'Change background photo'; removeRow.style.display = 'block';
     posRow.style.display = 'block'; if (slider) slider.value = pvBgPhotoY;
   } else {
     bgDiv.style.backgroundImage = ''; bgDiv.style.display = 'none';
     overlay.style.display = 'none'; card.classList.remove('has-bg');
+    if (wrap) { wrap.style.padding = '4px 0 8px'; wrap.style.background = '#f5f5f3'; }
     thumb.style.display = 'none';
     label.textContent = '📷  Add a background photo'; removeRow.style.display = 'none';
     posRow.style.display = 'none';
@@ -1342,8 +1402,11 @@ function pvSetBgPhotoY(val) {
 
 async function pvGetCanvas() {
   if (pvCachedCanvas) return pvCachedCanvas;
+  // Must match the wrapper's own inline background (set in pvApplyBgPhoto) — html2canvas
+  // rounds its canvas height up from the element's fractional CSS height, and that extra
+  // sub-pixel row falls back to this fill color rather than any painted DOM content.
   pvCachedCanvas = await withBakedBg(document.getElementById('pv-summary-bg-div'), pvBgPhoto, pvBgPhotoY, () =>
-    html2canvas(document.getElementById('pv-summary-capture'), { scale:2, backgroundColor:'#f5f5f3', useCORS:true, logging:false }));
+    html2canvas(document.getElementById('pv-summary-capture'), { scale:2, backgroundColor: pvBgPhoto ? '#000' : '#f5f5f3', useCORS:true, logging:false }));
   return pvCachedCanvas;
 }
 
@@ -1362,17 +1425,27 @@ async function pvShareImage(e) {
   const btn = e.target; btn.textContent = 'Preparing…'; btn.disabled = true;
   try {
     const canvas = await pvGetCanvas();
-    canvas.toBlob(async blob => {
-      const file = new File([blob], 'mabar-results.png', {type:'image/png'});
-      const title = ((pvSession && pvSession.sessionName) || 'Tennis Mabar')+' Results';
-      if (navigator.canShare && navigator.canShare({files:[file]})) {
-        await navigator.share({files:[file], title});
-      } else {
-        await navigator.share({title, text: pvBuildShareText()});
-      }
-      btn.textContent = 'Share'; btn.disabled = false;
+    // toBlob's callback isn't awaited by design, so anything thrown inside it — most
+    // commonly the user dismissing the native share sheet, which rejects
+    // navigator.share() — would otherwise never reach the reset below and leave the
+    // button stuck on "Preparing…" forever. Wrapping it in a promise the outer
+    // function actually awaits, with its own try/catch, guarantees the reset always runs.
+    await new Promise(resolve => {
+      canvas.toBlob(async blob => {
+        try {
+          const file = new File([blob], 'mabar-results.png', {type:'image/png'});
+          const title = ((pvSession && pvSession.sessionName) || 'Tennis Mabar')+' Results';
+          if (navigator.canShare && navigator.canShare({files:[file]})) {
+            await navigator.share({files:[file], title});
+          } else {
+            await navigator.share({title, text: pvBuildShareText()});
+          }
+        } catch(err) { /* cancelled or failed — button still resets below */ }
+        resolve();
+      });
     });
-  } catch(err) { btn.textContent = 'Share'; btn.disabled = false; }
+  } catch(err) { /* canvas generation failed — button still resets below */ }
+  btn.textContent = 'Share'; btn.disabled = false;
 }
 
 function pvBuildShareText() {
@@ -3110,9 +3183,9 @@ function renderSummaryBoard() {
     `<div class="summary-row">
       <span class="medal" style="font-size:12px;font-weight:700;color:#bbb">${i+4}</span>
       <div class="sum-avatar">${initials(p.name)}</div>
-      <span style="flex:1;font-size:14px">${p.name}</span>
-      <span style="font-size:12px;color:#aaa;margin-right:8px">${p.courtsPlayed||0} played</span>
-      <span style="font-size:15px;font-weight:700">${sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : sortMode==='matchpts' ? matchPtsDisplay(p) : p.score}</span>
+      <span style="flex:1;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>
+      <span class="sum-played">${p.courtsPlayed||0} played</span>
+      <span class="sum-pct">${sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : sortMode==='matchpts' ? matchPtsDisplay(p) : p.score}</span>
       ${sessionRatingHtml(p.name)}
     </div>`).join('');
 }
@@ -3134,6 +3207,7 @@ function renderSummary() {
 
 function applyBgPhoto() {
   const card=document.getElementById('summary-card-el');
+  const wrap=document.getElementById('summary-capture');
   const bgDiv=document.getElementById('summary-bg-div');
   const overlay=document.getElementById('summary-bg-overlay');
   const thumb=document.getElementById('bg-preview-thumb');
@@ -3145,12 +3219,17 @@ function applyBgPhoto() {
     const y = state.bgPhotoY ?? 35;
     bgDiv.style.backgroundImage=`url(${state.bgPhoto})`; bgDiv.style.transform=`scale(1.3) translateY(${(50-y)*0.3}%)`; bgDiv.style.display='block';
     overlay.style.display='block'; card.classList.add('has-bg');
+    // The wrapper's own light padding was designed to frame a plain white card — against
+    // a dark photo card it instead reads as a stray light border, worst at the top where
+    // it sits flush against the image edge. Going full-bleed avoids that entirely.
+    if (wrap) wrap.style.padding = '0';
     thumb.src=state.bgPhoto; thumb.style.display='block';
     label.textContent='Change background photo'; removeRow.style.display='block';
     posRow.style.display='block'; if (slider) slider.value=y;
   } else {
     bgDiv.style.backgroundImage=''; bgDiv.style.display='none';
     overlay.style.display='none'; card.classList.remove('has-bg');
+    if (wrap) wrap.style.padding = '4px 0 8px';
     thumb.style.display='none';
     label.textContent='📷  Add a background photo'; removeRow.style.display='none';
     posRow.style.display='none';
@@ -3264,7 +3343,7 @@ let cachedCanvas = null;
 async function getCanvas() {
   if (cachedCanvas) return cachedCanvas;
   cachedCanvas = await withBakedBg(document.getElementById('summary-bg-div'), state.bgPhoto, state.bgPhotoY, () =>
-    html2canvas(document.getElementById('summary-capture'), { scale:2, backgroundColor:'#f5f5f3', useCORS:true, logging:false }));
+    html2canvas(document.getElementById('summary-capture'), { scale:2, backgroundColor: state.bgPhoto ? '#000' : '#f5f5f3', useCORS:true, logging:false }));
   return cachedCanvas;
 }
 
@@ -3283,17 +3362,27 @@ async function shareImage(e) {
   const btn=e.target; btn.textContent='Preparing…'; btn.disabled=true;
   try {
     const canvas=await getCanvas();
-    canvas.toBlob(async blob=>{
-      const file=new File([blob],'mabar-results.png',{type:'image/png'});
-      const title=(state.sessionName||'Tennis Mabar')+' Results';
-      if(navigator.canShare&&navigator.canShare({files:[file]})){
-        await navigator.share({files:[file],title});
-      } else {
-        await navigator.share({title,text:buildShareText()});
-      }
-      btn.textContent='Share'; btn.disabled=false;
+    // toBlob's callback isn't awaited by design, so anything thrown inside it — most
+    // commonly the user dismissing the native share sheet, which rejects
+    // navigator.share() — would otherwise never reach the reset below and leave the
+    // button stuck on "Preparing…" forever. Wrapping it in a promise the outer
+    // function actually awaits, with its own try/catch, guarantees the reset always runs.
+    await new Promise(resolve => {
+      canvas.toBlob(async blob=>{
+        try {
+          const file=new File([blob],'mabar-results.png',{type:'image/png'});
+          const title=(state.sessionName||'Tennis Mabar')+' Results';
+          if(navigator.canShare&&navigator.canShare({files:[file]})){
+            await navigator.share({files:[file],title});
+          } else {
+            await navigator.share({title,text:buildShareText()});
+          }
+        } catch(err) { /* cancelled or failed — button still resets below */ }
+        resolve();
+      });
     });
-  } catch(err){ btn.textContent='Share'; btn.disabled=false; }
+  } catch(err) { /* canvas generation failed — button still resets below */ }
+  btn.textContent='Share'; btn.disabled=false;
 }
 
 function buildShareText() {
@@ -3891,6 +3980,24 @@ function renderStandingsPlayer() {
     return Object.assign(f, { n:n, pct: n ? Math.round(f.w/n*100) : 0 });
   }).sort(function(a,b){ return b.n-a.n || b.pct-a.pct || a.name.localeCompare(b.name); });
 
+  // Doubles partner performance: same aggregation as foes above, keyed on teammate
+  // instead of opponent. Singles matches contribute nothing here (partners is empty).
+  const pairs = {};
+  mine.forEach(function(x){
+    x.partners.forEach(function(p){
+      if (!pairs[p]) pairs[p] = { name:p, w:0, l:0, t:0 };
+      if (x.res==='w') pairs[p].w++; else if (x.res==='l') pairs[p].l++; else pairs[p].t++;
+    });
+  });
+  const pairList = Object.values(pairs).map(function(p){
+    const n = p.w+p.l+p.t;
+    return Object.assign(p, { n:n, winPct: n ? Math.round(p.w/n*100) : 0 });
+  });
+  // Both columns rank by the same win% — Worst Pair is just the low end of it, not a
+  // separate loss% figure — so "100%" never reads as if it were a good result.
+  const bestPairs = pairList.slice().sort(function(a,b){ return b.winPct-a.winPct || b.n-a.n || a.name.localeCompare(b.name); }).slice(0,3);
+  const worstPairs = pairList.slice().sort(function(a,b){ return a.winPct-b.winPct || b.n-a.n || a.name.localeCompare(b.name); }).slice(0,3);
+
   const rating = scope.rating[name];
   const other = monthly ? at.rating[name] : (m.rating[name] === undefined ? null : m.rating[name]);
   const otherLabel = monthly ? 'all-time' : monthLabelOf(key);
@@ -3926,6 +4033,20 @@ function renderStandingsPlayer() {
           + '<span class="pd-h2h-cell-pct ' + pctCls + '">' + f.pct + '%</span>'
           + '</div>';
       }).join('') + '</div>' : '<div class="roster-empty">No opponents recorded.</div>')
+
+    + '<div class="ms-group">Best &amp; worst pairs</div>'
+    + (pairList.length ? '<div class="pd-pairs-cols">'
+        + '<div class="pd-pairs-col"><div class="pd-pairs-col-title">Best Pair</div>'
+        +   bestPairs.map(function(p){
+              return '<div class="pd-pairs-row"><span class="pd-pairs-name">' + esc(p.name) + '</span><span class="pd-pairs-pct win">' + p.winPct + '%</span></div>';
+            }).join('')
+        + '</div>'
+        + '<div class="pd-pairs-col"><div class="pd-pairs-col-title">Worst Pair</div>'
+        +   worstPairs.map(function(p){
+              return '<div class="pd-pairs-row"><span class="pd-pairs-name">' + esc(p.name) + '</span><span class="pd-pairs-pct loss">' + p.winPct + '%</span></div>';
+            }).join('')
+        + '</div>'
+      + '</div>' : '<div class="roster-empty">No doubles matches recorded.</div>')
 
     + '<div class="ms-group">' + (monthly ? 'Match history this month' : 'Recent matches')
     +   (!monthly && mine.length > 40 ? ' <span style="text-transform:none;letter-spacing:0;color:#bbb">— latest 40 of ' + mine.length + '</span>' : '')
