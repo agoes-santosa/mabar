@@ -301,6 +301,11 @@
   .pd-pairs-pct { font-size: 12.5px; font-weight: 800; flex-shrink: 0; margin-left: 6px; }
   .pd-pairs-pct.win { color: #16a34a; }
   .pd-pairs-pct.loss { color: #dc2626; }
+  .pd-chart-endpoint { font-size: 18px; font-weight: 800; fill: #1a1a1a; font-variant-numeric: tabular-nums; }
+  .pd-chart-delta { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pd-chart-tooltip-bg { fill: #1a1a1a; }
+  .pd-chart-tooltip-text { font-size: 10px; fill: #fff; font-weight: 600; }
+  .pd-chart-tooltip-value { font-size: 10px; fill: #fff; font-weight: 800; }
   .pd-match { background: #fff; border: 0.5px solid #e5e5e0; border-radius: 10px; padding: .6rem .75rem; margin-bottom: .4rem; }
   .pd-match-top { display: flex; align-items: center; gap: 8px; font-size: 13px; }
   .pd-res { font-size: 10.5px; font-weight: 800; border-radius: 5px; padding: 2px 6px; flex-shrink: 0; }
@@ -4139,6 +4144,34 @@ function renderStandingsPlayer() {
   const bestPairs = pairList.slice().sort(function(a,b){ return b.winPct-a.winPct || b.n-a.n || a.name.localeCompare(b.name); }).slice(0,3);
   const worstPairs = pairList.slice().sort(function(a,b){ return a.winPct-b.winPct || b.n-a.n || a.name.localeCompare(b.name); }).slice(0,3);
 
+  // Rating over time: one point per played week, using whichever session's
+  // end-of-session rating was last recorded that week — the same number already
+  // shown elsewhere (podium, session summaries), just resampled onto a weekly axis.
+  // A week with no session simply has no point, rather than a flat held value, so
+  // the line visibly jumps the gap instead of implying nothing changed.
+  const seenSessions = {};
+  mine.forEach(function(x){
+    if (!seenSessions[x.code]) {
+      const info = scope.bySession[x.code];
+      if (info && info.end && info.end[name] !== undefined) {
+        seenSessions[x.code] = { when:x.when, session:x.session, rating:info.end[name] };
+      }
+    }
+  });
+  const weekOf = function(d){
+    const wd = new Date(d); wd.setHours(0,0,0,0);
+    wd.setDate(wd.getDate() - ((wd.getDay()+6)%7)); // back up to that week's Monday
+    return wd.getTime();
+  };
+  const weekMap = {};
+  Object.values(seenSessions).sort(function(a,b){ return a.when-b.when; }).forEach(function(s){
+    weekMap[weekOf(s.when)] = s; // a later session in the same week overwrites the earlier one
+  });
+  const ratingSeries = Object.keys(weekMap).sort(function(a,b){ return +a-+b; }).map(function(wk){
+    const s = weekMap[wk];
+    return { t:+wk, session:s.session, when:s.when, v:s.rating };
+  });
+
   const rating = scope.rating[name];
   const other = monthly ? at.rating[name] : (m.rating[name] === undefined ? null : m.rating[name]);
   const otherLabel = monthly ? 'all-time' : monthLabelOf(key);
@@ -4165,6 +4198,10 @@ function renderStandingsPlayer() {
     +     st.matches + ' match' + (st.matches===1?'':'es') + ' · '
     +     Object.keys(st.sess).length + ' session' + (Object.keys(st.sess).length===1?'':'s') + '</div>'
     + '</div>'
+
+    + (ratingSeries.length >= 2
+        ? '<div class="card"><div class="card-title">Rating over time</div><svg id="pd-chart" viewBox="0 0 303 148" style="width:100%;display:block;overflow:visible"></svg></div>'
+        : '')
 
     + '<div class="ms-group" style="padding-top:0">Record against each opponent</div>'
     + (h2h.length ? '<div class="pd-h2h-grid">' + h2h.map(function(f){
@@ -4208,6 +4245,174 @@ function renderStandingsPlayer() {
           +   (x.when ? x.when.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '')
           + '</div></div>';
       }).join('') : '<div class="roster-empty">No matches recorded.</div>');
+
+  if (ratingSeries.length >= 2) renderRatingChart(document.getElementById('pd-chart'), ratingSeries);
+}
+
+// Fritsch-Carlson monotone cubic interpolation: curves smoothly through every point
+// but is mathematically clamped so a segment can never swing above a real local high
+// or below a real local low between two points — smooth without implying a rating
+// swing that never happened.
+function monotonePath(pts) {
+  const n = pts.length;
+  if (n < 2) return '';
+  if (n < 3) return 'M ' + pts[0].x + ',' + pts[0].y + ' L ' + pts[1].x + ',' + pts[1].y;
+
+  const dx = [], d = [];
+  for (let i = 0; i < n - 1; i++) {
+    dx.push(pts[i+1].x - pts[i].x);
+    d.push((pts[i+1].y - pts[i].y) / dx[i]);
+  }
+  const m = new Array(n);
+  m[0] = d[0];
+  m[n-1] = d[n-2];
+  for (let i = 1; i < n-1; i++) {
+    m[i] = (d[i-1] === 0 || d[i] === 0 || (d[i-1] < 0) !== (d[i] < 0)) ? 0 : (d[i-1] + d[i]) / 2;
+  }
+  for (let i = 0; i < n-1; i++) {
+    if (d[i] === 0) { m[i] = 0; m[i+1] = 0; continue; }
+    const a = m[i] / d[i], b = m[i+1] / d[i];
+    const s = a*a + b*b;
+    if (s > 9) {
+      const tau = 3 / Math.sqrt(s);
+      m[i] = tau * a * d[i];
+      m[i+1] = tau * b * d[i];
+    }
+  }
+  let path = 'M ' + pts[0].x + ',' + pts[0].y;
+  for (let i = 0; i < n-1; i++) {
+    const cp1x = pts[i].x + dx[i]/3, cp1y = pts[i].y + m[i]*dx[i]/3;
+    const cp2x = pts[i+1].x - dx[i]/3, cp2y = pts[i+1].y - m[i+1]*dx[i]/3;
+    path += ' C ' + cp1x + ',' + cp1y + ' ' + cp2x + ',' + cp2y + ' ' + pts[i+1].x + ',' + pts[i+1].y;
+  }
+  return path;
+}
+
+// Draws the player-detail rating chart into `svg`: smoothed line + gradient fill, a
+// solid dot on the current point only (earlier points fade into the line instead of
+// dotting it up), and a tap/drag crosshair whose tooltip names the session that
+// produced each point. Rebuilds from scratch on every call, since a fresh player
+// profile render is exactly when this runs.
+function renderRatingChart(svg, data) {
+  if (!svg) return;
+  const padL = 8, padR = 8, padT = 20, padB = 16;
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const vb = svg.viewBox.baseVal;
+  const W = vb.width, H = vb.height;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+
+  const minT = data[0].t, maxT = data[data.length-1].t;
+  const vals = data.map(function(d){ return d.v; });
+  const minV = Math.min.apply(null, vals) - 12;
+  const maxV = Math.max.apply(null, vals) + 12;
+
+  const x = function(t){ return padL + (maxT === minT ? plotW/2 : (t - minT) / (maxT - minT) * plotW); };
+  const y = function(v){ return padT + plotH - (v - minV) / (maxV - minV) * plotH; };
+  const pts = data.map(function(d){ return {x:x(d.t), y:y(d.v)}; });
+
+  const NS = 'http://www.w3.org/2000/svg';
+  function mk(tag, attrs) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  const gradId = 'pd-chart-grad-' + Math.random().toString(36).slice(2);
+  const defs = mk('defs', {});
+  const grad = mk('linearGradient', {id:gradId, x1:'0', y1:'0', x2:'0', y2:'1'});
+  grad.appendChild(mk('stop', {offset:'0%', 'stop-color':'#5b4fcf', 'stop-opacity':'0.16'}));
+  grad.appendChild(mk('stop', {offset:'100%', 'stop-color':'#5b4fcf', 'stop-opacity':'0'}));
+  defs.appendChild(grad);
+  svg.appendChild(defs);
+
+  const linePath = monotonePath(pts);
+  const areaPath = linePath + ' L ' + (padL+plotW) + ',' + (padT+plotH) + ' L ' + padL + ',' + (padT+plotH) + ' Z';
+  svg.appendChild(mk('path', {d:areaPath, fill:'url(#'+gradId+')', stroke:'none'}));
+  svg.appendChild(mk('path', {d:linePath, fill:'none', stroke:'#5b4fcf', 'stroke-width':2, 'stroke-linejoin':'round', 'stroke-linecap':'round'}));
+
+  const dotEls = data.map(function(d,i){
+    const isLast = i === data.length - 1;
+    const c = mk('circle', {
+      cx:pts[i].x, cy:pts[i].y, r: isLast ? 5 : 2.5,
+      fill:'#5b4fcf', stroke:'#fff', 'stroke-width': isLast ? 2 : 1, opacity: isLast ? 1 : 0.45
+    });
+    svg.appendChild(c);
+    return c;
+  });
+
+  const last = data[data.length-1], prev = data[data.length-2];
+  const endX = Math.min(pts[pts.length-1].x, padL+plotW-30);
+  const val = mk('text', {x:endX, y:padT-5, class:'pd-chart-endpoint', 'text-anchor':'middle'});
+  val.textContent = Math.round(last.v);
+  svg.appendChild(val);
+  const dv = Math.round(last.v - prev.v);
+  const dl = mk('text', {x:endX, y:padT+10, class:'pd-chart-delta', 'text-anchor':'middle', fill: dv >= 0 ? '#16a34a' : '#dc2626'});
+  dl.textContent = (dv >= 0 ? '+' : '') + dv;
+  svg.appendChild(dl);
+
+  const cross = mk('line', {y1:padT-2, y2:padT+plotH, stroke:'#c7c3b8', 'stroke-width':1, opacity:0});
+  svg.appendChild(cross);
+  const hi = mk('circle', {r:6, fill:'#5b4fcf', stroke:'#fff', 'stroke-width':2, opacity:0});
+  svg.appendChild(hi);
+
+  // One <text> with two tspans for the label/value styling split, each measured on
+  // its own and given an explicit absolute x — a relative dx gap plus a combined
+  // getComputedTextLength() read isn't handled consistently enough across engines
+  // to trust for symmetric padding.
+  const tip = mk('g', {opacity:0});
+  const tipBg = mk('rect', {rx:5, ry:5, class:'pd-chart-tooltip-bg'});
+  const tipText = mk('text', {class:'pd-chart-tooltip-text'});
+  const tspanLabel = mk('tspan', {});
+  const tspanVal = mk('tspan', {class:'pd-chart-tooltip-value'});
+  tipText.appendChild(tspanLabel); tipText.appendChild(tspanVal);
+  tip.appendChild(tipBg); tip.appendChild(tipText);
+  svg.appendChild(tip);
+
+  function showAt(idx) {
+    const d = data[idx], px = pts[idx].x, py = pts[idx].y;
+    cross.setAttribute('x1', px); cross.setAttribute('x2', px); cross.setAttribute('opacity', 1);
+    hi.setAttribute('cx', px); hi.setAttribute('cy', py); hi.setAttribute('opacity', 1);
+    dotEls.forEach(function(c,i){ c.setAttribute('opacity', i===idx ? 0 : (i === data.length-1 ? 1 : 0.45)); });
+
+    tspanLabel.textContent = d.session + ' · ' + (d.when ? d.when.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '');
+    tspanVal.textContent = Math.round(d.v);
+    const padX = 8, gapBetween = 10;
+    const labelW = tspanLabel.getComputedTextLength();
+    const valW = tspanVal.getComputedTextLength();
+    const tw = padX + labelW + gapBetween + valW + padX;
+    let tx = px - tw/2;
+    tx = Math.max(padL, Math.min(tx, padL+plotW-tw));
+    const ty = py - 30;
+    tipBg.setAttribute('x', tx); tipBg.setAttribute('y', ty); tipBg.setAttribute('width', tw); tipBg.setAttribute('height', 20);
+    tipText.setAttribute('y', ty+13.5);
+    tspanLabel.setAttribute('x', tx + padX);
+    tspanVal.setAttribute('x', tx + padX + labelW + gapBetween);
+    tip.setAttribute('opacity', 1);
+  }
+  function hide() {
+    cross.setAttribute('opacity', 0); hi.setAttribute('opacity', 0); tip.setAttribute('opacity', 0);
+    dotEls.forEach(function(c,i){ c.setAttribute('opacity', i === data.length-1 ? 1 : 0.45); });
+  }
+
+  const overlay = mk('rect', {x:0, y:0, width:W, height:H, fill:'transparent', style:'touch-action:pan-y'});
+  svg.appendChild(overlay);
+
+  function nearestIdx(clientX) {
+    const rect = svg.getBoundingClientRect();
+    const svgX = (clientX - rect.left) / rect.width * W;
+    let best = 0, bestD = Infinity;
+    pts.forEach(function(p,i){ const dist = Math.abs(p.x - svgX); if (dist < bestD) { bestD = dist; best = i; } });
+    return best;
+  }
+  let active = false;
+  // Pointer capture (not a window-level listener) keeps a drag tracking correctly
+  // even if it strays outside the chart's bounds — and unlike a window listener,
+  // it's scoped to this element, so nothing accumulates across repeated profile views.
+  overlay.addEventListener('pointerdown', function(e){ active = true; overlay.setPointerCapture(e.pointerId); showAt(nearestIdx(e.clientX)); });
+  overlay.addEventListener('pointermove', function(e){ if (active) showAt(nearestIdx(e.clientX)); });
+  overlay.addEventListener('pointerup', function(){ active = false; });
+  overlay.addEventListener('pointerleave', function(){ if (!active) hide(); });
+  overlay.addEventListener('mouseenter', function(e){ showAt(nearestIdx(e.clientX)); });
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
