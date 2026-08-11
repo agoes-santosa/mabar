@@ -173,7 +173,7 @@
   .podium-block-1 { height: 72px; background: #fef3c7; color: #d97706; }
   .podium-block-2 { height: 52px; background: #f1f5f9; color: #64748b; }
   .podium-block-3 { height: 40px; background: #fdf4e7; color: #92400e; }
-  .podium-name { font-size: 13px; font-weight: 600; text-align: center; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .podium-name { font-size: 13px; font-weight: 600; text-align: center; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
   .podium-pts { font-size: 11px; color: #888; }
   .podium-value { font-size: 16px; font-weight: 800; color: #1a1a1a; }
   .podium-avatar { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; overflow: hidden; flex-shrink: 0; }
@@ -1206,7 +1206,16 @@ function pvScore(val) {
   return (val !== '' && val !== null && val !== undefined) ? val : '—';
 }
 
+let pvLiveSession = null;
 function renderPlayerLive(s, round) {
+  pvLiveSession = s;
+  // This whole screen is rebuilt from scratch on every live update (a new round, an
+  // edited score, anything), which would otherwise snap an open Round History dropdown
+  // shut mid-read every time someone else's action comes in — so carry its open/closed
+  // state across the rebuild instead of always starting collapsed.
+  const prevList = document.getElementById('pv-live-history-list');
+  const historyWasOpen = !!prevList && prevList.style.display !== 'none';
+
   const sorted = [...s.players].sort((a, b) => b.score - a.score);
   const totalPts = s.players.reduce((t, p) => t + (p.score || 0), 0);
 
@@ -1249,7 +1258,7 @@ function renderPlayerLive(s, round) {
     </div>`;
   }
 
-  html += `<div class="card">
+  html += `<div class="card" style="margin-bottom:.875rem">
     <div class="card-title">Standings</div>
     ${sorted.map((p, i) => {
       const rc = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank';
@@ -1263,7 +1272,34 @@ function renderPlayerLive(s, round) {
     }).join('')}
   </div>`;
 
+  // So a spectator opening the link mid-session can catch up on what's already been
+  // played — collapsed by default to keep the current round/standings the focus.
+  html += `<div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="pvToggleLiveHistory()">
+      <span class="card-title" style="margin-bottom:0">Round history</span>
+      <span id="pv-live-history-chevron" style="color:#888;font-size:11px">${historyWasOpen ? '▴' : '▾'}</span>
+    </div>
+    <div id="pv-live-history-list" style="display:${historyWasOpen ? 'block' : 'none'};margin-top:.75rem"></div>
+  </div>`;
+
   document.getElementById('pv-content').innerHTML = html;
+  if (historyWasOpen) renderPvLiveHistory();
+}
+
+function pvToggleLiveHistory() {
+  const list = document.getElementById('pv-live-history-list');
+  const chevron = document.getElementById('pv-live-history-chevron');
+  const opening = list.style.display === 'none';
+  list.style.display = opening ? 'block' : 'none';
+  if (chevron) chevron.textContent = opening ? '▴' : '▾';
+  if (opening) renderPvLiveHistory();
+}
+
+function renderPvLiveHistory() {
+  const list = document.getElementById('pv-live-history-list');
+  if (!list || !pvLiveSession) return;
+  const hist = pvLiveSession.history || [];
+  list.innerHTML = hist.length ? roundHistoryBlocksHtml(hist) : '<div class="roster-empty">No rounds finished yet.</div>';
 }
 
 // Sessions saved before pointsAgainst / matchPts existed don't carry those fields, so
@@ -1351,7 +1387,7 @@ function renderPvSummaryBoard() {
   document.getElementById('pv-summary-podium').innerHTML = podiumOrder.map((p, i) => `
     <div class="podium-slot">
       <div class="podium-avatar ${avCls[i]}">${pvInitials(p.name)}</div>
-      <div class="podium-name">${p.name}</div>
+      <div class="podium-name" onclick="${playerProfileOnclick(p.name)}">${p.name}</div>
       <div class="podium-value">${metric(p)}${pvSortMode==='points'||pvSortMode==='matchpts' ? ' pts' : ''}</div>
       <div class="podium-pts">${p.courtsPlayed || 0} played</div>
       ${sessionRatingHtml(p.name) ? `<div class="podium-pts" style="margin-left:0">${sessionRatingHtml(p.name)}</div>` : ''}
@@ -1362,7 +1398,7 @@ function renderPvSummaryBoard() {
     <div class="summary-row">
       <span class="medal" style="font-size:12px;font-weight:700;color:#bbb">${i + 4}</span>
       <div class="sum-avatar">${pvInitials(p.name)}</div>
-      <span style="flex:1;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>
+      <span style="flex:1;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="${playerProfileOnclick(p.name)}">${p.name}</span>
       <span class="sum-played">${p.courtsPlayed || 0} played</span>
       <span class="sum-pct">${metric(p)}</span>
       ${sessionRatingHtml(p.name)}
@@ -1383,18 +1419,24 @@ function pvToggleHistory() {
   if (opening) renderPvHistory();
 }
 
-function renderPvHistory() {
-  const list = document.getElementById('pv-history-list');
-  if (!pvSession) return;
-  const hist = pvSession.history || [];
-  if (!hist.length) { list.innerHTML = '<div class="roster-empty">No rounds recorded.</div>'; return; }
-  list.innerHTML = hist.map(h => `<div class="history-block">
+// Read-only round-by-round blocks, shared by the finished-session viewer and the live
+// spectator view below — same data shape (h.round/h.courts/h.sittingOut) either way,
+// just sourced from a static pvSession there vs. the latest live snapshot here.
+function roundHistoryBlocksHtml(hist) {
+  return (hist || []).map(h => `<div class="history-block">
       <div style="font-size:11px;font-weight:700;color:#5b4fcf;margin-bottom:6px">Round ${h.round}</div>
       ${(h.courts || []).map((c, ci) =>
         `<div class="history-item">Court ${ci + 1}: ${c.team1.join(' & ')} ${c.score1 || 0}–${c.score2 || 0} ${c.team2.join(' & ')}</div>`
       ).join('')}
       ${h.sittingOut && h.sittingOut.length ? `<div style="font-size:11px;color:#bbb;margin-top:3px">Resting: ${h.sittingOut.join(', ')}</div>` : ''}
     </div>`).join('');
+}
+
+function renderPvHistory() {
+  const list = document.getElementById('pv-history-list');
+  if (!pvSession) return;
+  const hist = pvSession.history || [];
+  list.innerHTML = hist.length ? roundHistoryBlocksHtml(hist) : '<div class="roster-empty">No rounds recorded.</div>';
 }
 
 // ── HISTORY/LIVE VIEWER: background photo + export ───────────────────────────
@@ -3239,7 +3281,7 @@ function renderSummaryBoard() {
   document.getElementById('summary-podium').innerHTML = podiumOrder.map((p,i) =>
     `<div class="podium-slot">
       <div class="podium-avatar ${avCls[i]}">${initials(p.name)}</div>
-      <div class="podium-name">${p.name}</div>
+      <div class="podium-name" onclick="${playerProfileOnclick(p.name)}">${p.name}</div>
       <div class="podium-value">${sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : sortMode==='matchpts' ? matchPtsDisplay(p)+' pts' : p.score+' pts'}</div>
       <div class="podium-pts">${p.courtsPlayed||0} played</div>
       ${sessionRatingHtml(p.name) ? `<div class="podium-pts" style="margin-left:0">${sessionRatingHtml(p.name)}</div>` : ''}
@@ -3250,7 +3292,7 @@ function renderSummaryBoard() {
     `<div class="summary-row">
       <span class="medal" style="font-size:12px;font-weight:700;color:#bbb">${i+4}</span>
       <div class="sum-avatar">${initials(p.name)}</div>
-      <span style="flex:1;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>
+      <span style="flex:1;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="${playerProfileOnclick(p.name)}">${p.name}</span>
       <span class="sum-played">${p.courtsPlayed||0} played</span>
       <span class="sum-pct">${sortMode==='winrate' ? winRatePct(p) : sortMode==='ptspct' ? pointPct(p) : sortMode==='matchpts' ? matchPtsDisplay(p) : p.score}</span>
       ${sessionRatingHtml(p.name)}
@@ -3970,7 +4012,7 @@ function renderStandings() {
       ? (r.alt === null ? '' : '<div class="ms-alt">all-time ' + Math.round(r.alt) + '</div>')
       : (r.last ? '<div class="ms-alt">last ' + r.last.toLocaleDateString('en-US',{month:'short',year:'numeric'}) + '</div>' : '');
     return '<div class="ms-row' + (showRank && i===0 ? ' top1' : '') + '" style="cursor:pointer"'
-      + ' onclick="openStandingsPlayer(\'' + esc(r.name).replace(/'/g,'&#39;') + '\')">'
+      + ' onclick="openStandingsPlayer(\'' + jsAttr(r.name) + '\')">'
       + '<div class="ms-rank">' + (showRank ? (i+1) : '–') + '</div>'
       + '<div class="ms-main">'
       +   '<div class="ms-name">' + esc(r.name)
@@ -4029,6 +4071,29 @@ function rankWithin(stats, rating, name) {
 
 function openStandingsPlayer(name) { standingsPlayer = name; renderStandingsPlayer(); window.scrollTo({top:0}); }
 function closeStandingsPlayer()    { standingsPlayer = null; renderStandings(); window.scrollTo({top:0}); }
+
+// Jumps from a session summary (live or from Session History) straight to that
+// player's Leaderboard profile. showStandings() loads standingsData itself (and resets
+// to the monthly view) before this opens the specific player, so it works even if the
+// Leaderboard has never been visited yet this page load. If the player has no rated
+// history anywhere (e.g. every session they've played is casual), showStandings()
+// already shows its own empty state and there's no profile to open.
+async function goToPlayerProfile(name) {
+  await showStandings();
+  if (standingsMonths && standingsMonths.length) openStandingsPlayer(name);
+}
+// Safely embeds `name` as a single-quoted JS argument inside an onclick="..." (double-
+// quoted) attribute. Order matters: escape backslash first, then the apostrophe that
+// delimits the JS string (as \', not as an HTML entity — an entity would decode back
+// to a literal ' before the browser compiles the attribute as JS, undoing the escape
+// right when it's needed), then the characters that could break the HTML attribute
+// itself (& and ").
+function jsAttr(str) {
+  return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+function playerProfileOnclick(name) {
+  return "goToPlayerProfile('" + jsAttr(name) + "')";
+}
 
 function renderStandingsPlayer() {
   const el = document.getElementById('standings-body');
