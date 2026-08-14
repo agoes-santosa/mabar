@@ -22,6 +22,7 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 - **Manage roster** — a small link under the roster chips (Setup screen), PIN-gated, for fixing a name after the fact. **Rename** rewrites that player everywhere — round history, courts, resting/absent lists, schedules, and the partner/opponent history — so their record stays in one piece instead of splitting across two spellings. **Merge** does the same into an existing player, but refuses outright — before it even asks you to confirm — if the two names ever appear together in one session, since that means they're two different people who played on the same day. The PIN (default `1234`, set in the source) is a guard against an accidental tap on a destructive action, not real security — same honest trade-off as the referee PIN.
 - **Gender-balanced doubles** — mark players ♂/♀ with one tap on the player list. In doubles, an all-female pair is never matched against an all-male pair; mixed pairings are unrestricted. Female players get a small ♀ mark on court cards so balance is visible at a glance.
 - **Fixed partners & fixed teams** — tap the **Team** chip on any player to put them in Team 1–6. One rule covers both uses: *teammates partner each other whenever both are on court, and never face each other.* So a team of exactly **2 is a fixed pair** (they're always partners, and rest together rather than being split), while a **bigger team plays as a team** — it fields whole sides across courts, and an odd member partners outside the team for that round. Everyone defaults to no team and shuffles freely as before. Works in Singles too, where it simply means teammates never play each other. Teams show a coloured T-tag on court cards and in the schedule, and the setup screen warns you if a team can't be seated (a 3-person team can't share one doubles court) or if a pair will end up playing every round.
+- **Rating-balanced shuffling** — court matchups also weigh each player's current all-time rating, so a lopsided rank #1-and-#2-vs-#19-and-#20 pairing is avoided where a fairer option exists. Lowest priority of all the shuffle rules — team and gender constraints are unaffected, and a fresh partnership always wins over a better rating gap; rating only decides between options that are otherwise equally good on history. New or never-played players default to the average rating (1000) unless given a **Skill** chip (Setup screen and Players tab, next to Team) — Beginner / Intermediate / Advanced substitute a representative rating for whoever the computed one doesn't do justice to. Set per session, not saved to the roster, and works for established players too — dimmed once someone has 10+ real matches as a hint it's probably not needed, but exactly as tappable, and a manually-set category always wins over the computed rating with no automatic cutoff.
 - **Flexible courts** — set 1 to 6 courts at the start; the app fills them optimally each round.
 - **Four sort modes** — view standings by **Raw Pts** (games won), **Win %** (wins ÷ courts played), **Pts %** (points scored ÷ maximum possible), or **Match Pts** (a flat 2 points for a win, 1 for a loss — rewards winning the match itself over the scoreline). Available in both the in-game Standings tab and the Summary screen. Exact ties (same value on the active mode) are broken automatically by point differential — total games won minus games lost across the session.
 - **Small-sample protection** — in Win % and Pts % mode, players need at least the median number of rounds played (among everyone who's played) to rank in the top 3. A player who joined late and went 1-for-1 won't out-rank someone with a full, proven record — they still appear in the list with their real stats, just not on the podium. Raw Pts and Match Pts are unaffected, since both already reward playing more rounds.
@@ -78,6 +79,16 @@ Because a court side holds two players, a team of exactly 2 is therefore a fixed
 Where a team and gender balance genuinely conflict — an all-male pair that can only face an all-female pair — the team wins, since it was set deliberately.
 
 The cost is rotation freedom. Measured over 12 rounds, teams make almost no difference (a spread of 3.2 rounds vs 2.8 without, at 9 players on 2 courts). The exception is a field barely bigger than one court: at 5 players on 1 court a fixed pair plays every round, because resting both would need 4 unteamed players and only 3 exist. The setup screen calls that out.
+
+### Rating-balanced shuffling
+
+Once team and gender constraints are satisfied, and after repeat partnerships and opponents are minimised, there's one more thing left to optimise: keeping each court's two sides close in overall skill, using each player's current all-time rating (see Monthly standings & ratings below). This is the **lowest-priority** rule of the four — it only ever gets to choose between options that are already equally good on team, gender, and history, since a small rating-gap improvement is never worth reviving a repeat partnership.
+
+Concretely, a repeat partnership costs 30× a single rating point in the matchup comparison, and a repeat opponent costs roughly 15 — both calibrated against real session data so a genuine repeat essentially never loses to a rating consideration, while a large enough gap (100+ points) can still break a tie between two options that are otherwise identical on history.
+
+A player who hasn't played enough matches for a reliable rating defaults to the average (1000) rather than being penalised or favoured. If that default clearly doesn't reflect their real level, set a **Skill** category on the player list (Setup screen, and the Players tab mid-session) — Beginner, Intermediate, or Advanced substitutes a representative rating (below 1000 / roughly 1000–1150 / above 1150) for the computed one. It's set fresh per session, not saved to the roster the way ♂/♀ is, and it works for established players too, not only new ones — a real rating can still be wrong. The chip dims once someone has 10+ real matches, as a hint they probably don't need it, but it stays exactly as tappable either way, and once set it always wins over the computed rating.
+
+Ratings are fetched once, when you tap **Generate Matches**, and frozen for the rest of the session — the shuffle stays fully synchronous and works offline after that one fetch, same as everything else in the round-generation engine.
 
 ---
 
@@ -169,6 +180,19 @@ open index.html   # macOS
 ---
 
 ## Changelog
+
+### v3.7 (August 2026)
+
+**Rating-balanced shuffling**
+- Court matchups now also weigh each player's current all-time rating — so rank #1-and-#2 doesn't end up against rank #19-and-#20 when a fairer split is available. Lowest priority of all the shuffle rules: team and gender constraints are unaffected, and a repeat partnership still always wins over a better rating gap — rating only decides between options that are already equally good on everything else.
+- Calibrated so a repeat partnership costs 30× a single rating point and a repeat opponent costs roughly 15, both tuned against real session data — a genuine repeat essentially never loses to a rating consideration, while a large enough gap (100+ points) can still break a tie among otherwise-equal options.
+- A player's rating is fetched once, at "Generate Matches", and frozen for the rest of the session — the shuffle stays fully synchronous and works offline after that one fetch, same as the rest of the round-generation engine.
+- Verified by replaying two real past sessions (Selasa Mabar, Kamiz/Thursday) through the actual shuffle code, chronologically round by round — matches an earlier hand-reviewed mockup almost exactly (24% and 8% average rating-gap reduction respectively), with zero partner-repeat regressions and zero new gender/team violations. Caught and fixed a real calibration bug this way: a first-pass weight let rating override a genuine repeat-opponent case, invisible without the real-data replay.
+
+**Skill category override**
+- New **Skill** chip on the player list (Setup screen and Players tab), left of Team — Beginner, Intermediate, or Advanced substitutes a representative rating (below 1000 / roughly 1000–1150 / above 1150) for a player whose computed rating doesn't reflect their real level. Mainly for brand-new players, who'd otherwise default to a flat 1000, but works for anyone.
+- Set per session, not saved to the roster like ♂/♀ is — every new session starts everyone uncategorized.
+- Always overrides the computed rating when set, with no automatic cutoff — an established player's rating can still be wrong, so the chip stays fully clickable for them too. It's just dimmed at 10+ real matches, as a hint it's probably not needed rather than a restriction.
 
 ### v3.6 (August 2026)
 

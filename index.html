@@ -103,6 +103,19 @@
   .team-mark { font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 6px; color: #fff; vertical-align: 1px; }
   #team-picker { position: fixed; background: #fff; border-radius: 12px; border: 0.5px solid #e5e5e0; padding: 6px; box-shadow: 0 4px 24px rgba(0,0,0,0.15); z-index: 150; min-width: 160px; }
   .team-opt { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: none; border: none; padding: 9px 12px; font-size: 15px; font-weight: 600; color: #1a1a1a; cursor: pointer; border-radius: 8px; }
+
+  .skill-chip { border: none; border-radius: 20px; font-size: 12px; font-weight: 700; min-width: 40px; min-height: 30px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; background: #f0f0ec; color: #999; }
+  .skill-chip.skill-beg { background: #dcfce7; color: #166534; }
+  .skill-chip.skill-int { background: #e0f2fe; color: #0369a1; }
+  .skill-chip.skill-adv { background: #e8e4fe; color: #5b4fcf; }
+  /* Established players don't usually need this, but a provisional-turned-real rating
+     can still be wrong — so it stays fully clickable, just quiet until deliberately set. */
+  .skill-chip.skill-dim { opacity: .38; transition: opacity .15s; }
+  .skill-chip.skill-dim:hover, .skill-chip.skill-dim:focus-visible { opacity: .75; }
+  #skill-picker { position: fixed; background: #fff; border-radius: 12px; border: 0.5px solid #e5e5e0; padding: 6px; box-shadow: 0 4px 24px rgba(0,0,0,0.15); z-index: 150; min-width: 220px; }
+  .skill-opt { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: none; border: none; padding: 9px 12px; font-size: 15px; font-weight: 600; color: #1a1a1a; cursor: pointer; border-radius: 8px; }
+  .skill-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .skill-context { font-size: 11.5px; color: #888; line-height: 1.45; padding: 4px 12px 10px; border-bottom: 0.5px solid #f0f0ec; margin-bottom: 4px; }
   .team-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
   .team-warn { background: #fef3c7; border: 1px solid #fbbf24; border-radius: 10px; padding: .7rem .8rem; margin-top: .75rem; font-size: 12.5px; color: #92400e; line-height: 1.55; }
 
@@ -467,7 +480,7 @@
       <div id="team-warning" class="team-warn" style="display:none"></div>
     </div>
     <div id="start-error" style="color:#dc2626;font-size:14px;margin-bottom:.75rem;display:none"></div>
-    <button class="btn btn-primary btn-full" onclick="startGame()">Generate Matches</button>
+    <button class="btn btn-primary btn-full" onclick="startGame(event)">Generate Matches</button>
     <div style="height:.5rem"></div>
   </div>
 
@@ -740,6 +753,12 @@
   <div id="team-picker-opts"></div>
 </div>
 
+<div id="skill-picker" style="display:none">
+  <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;padding:4px 12px 4px">Skill category (this session)</div>
+  <div id="skill-picker-context"></div>
+  <div id="skill-picker-opts"></div>
+</div>
+
 <div id="roster-pin-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;z-index:220;padding:1.5rem">
   <div style="background:#fff;border-radius:16px;padding:1.5rem 1.35rem;max-width:330px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.15)">
     <div style="width:44px;height:44px;border-radius:50%;background:#f0effe;color:#5b4fcf;display:flex;align-items:center;justify-content:center;font-size:19px;margin-bottom:.75rem">🔒</div>
@@ -867,6 +886,7 @@ let state = {
   history: [],
   partnerHistory: {},
   opponentHistory: {},
+  playerRatings: {},
   absentNext: new Set()
 };
 
@@ -885,8 +905,9 @@ function load() {
       p.absentNext = new Set(p.absentNext || []);
       p.partnerHistory = p.partnerHistory || {};
       p.opponentHistory = p.opponentHistory || {};
+      p.playerRatings = p.playerRatings || {};
       const needsRecalc = (p.players || []).some(pl => pl.pointsAgainst == null || pl.matchPts == null);
-      (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; pl.gender = pl.gender || 'M'; pl.team = pl.team || 0; pl.pointsAgainst = pl.pointsAgainst || 0; pl.matchPts = pl.matchPts || 0; });
+      (p.players || []).forEach(pl => { pl.wins = pl.wins || 0; pl.maxPossible = pl.maxPossible || 0; pl.gender = pl.gender || 'M'; pl.team = pl.team || 0; pl.skillCategory = pl.skillCategory || null; pl.pointsAgainst = pl.pointsAgainst || 0; pl.matchPts = pl.matchPts || 0; });
       if (p.bgPhotoY == null) p.bgPhotoY = 35;
       if (p.sessionCode == null) p.sessionCode = null;
       if (p.isFinished == null) p.isFinished = false;
@@ -1000,7 +1021,8 @@ async function claimBaton(code, pin) {
   await ref.update({ controllerId: MY_DEVICE });
 
   s.absentNext = new Set(s.absentNext || []);
-  (s.players || []).forEach(pl => { pl.team = pl.team || 0; });
+  s.playerRatings = s.playerRatings || {};
+  (s.players || []).forEach(pl => { pl.team = pl.team || 0; pl.skillCategory = pl.skillCategory || null; });
   s.sessionCode = code;
   s.refPin = d.refPin;
   state = s;
@@ -1708,7 +1730,7 @@ function renderNameWarning(info) {
 
 function addPlayerRecord(name, gender) {
   if (state.players.some(function(p){ return nameKey(p.name) === nameKey(name); })) return false;
-  state.players.push({ name:name, gender:gender||'M', team:0, score:0, pointsAgainst:0, matchPts:0,
+  state.players.push({ name:name, gender:gender||'M', team:0, skillCategory:null, score:0, pointsAgainst:0, matchPts:0,
     rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
   save();
   return true;
@@ -2160,6 +2182,86 @@ document.addEventListener('click', e => {
   }
 }, true);
 
+// ── SKILL CATEGORY PICKER ────────────────────────────────────────────────────
+// A per-player override for whoever the computed rating doesn't do justice to — most
+// often a brand-new player defaulting to ELO_START, but sometimes an established one
+// whose real rating still feels wrong. Session-only: it lives on this session's player
+// entry, same as Team, and is never written back to the roster the way Gender is — so
+// it never lingers past the session it was actually needed for.
+//
+// A set category always wins over the computed rating, no threshold, no exceptions —
+// see getRating(). The chip itself is dimmed (not disabled) once a player has enough
+// real matches to usually not need it, purely as a hint; it's exactly as clickable
+// either way.
+const SKILL_ANCHORS = { beginner: 850, intermediate: 1075, advanced: 1250 };
+const SKILL_LABELS  = { beginner: 'Beg', intermediate: 'Int', advanced: 'Adv' };
+
+// Background-loaded league snapshot, purely so Setup/Players can show real ratings and
+// match counts (for dimming + the picker's context line) before a session has frozen
+// its own state.playerRatings. Never used by the shuffle itself — that reads
+// state.playerRatings via getRating(), frozen once at startGame().
+let leagueSnapshot = null;
+function loadLeagueSnapshot() {
+  getLeague().then(function(league){
+    leagueSnapshot = league;
+    if (state.round > 0) renderPlayerListGame(); else renderSetup();
+  });
+}
+function playerMatches(name) {
+  return (leagueSnapshot && leagueSnapshot.allTime.stats[name]) ? leagueSnapshot.allTime.stats[name].matches : 0;
+}
+function playerRealRating(name) {
+  return (leagueSnapshot && leagueSnapshot.allTime.rating[name] !== undefined) ? leagueSnapshot.allTime.rating[name] : ELO_START;
+}
+
+function skillChipHtml(p) {
+  const dim = !p.skillCategory && playerMatches(p.name) >= RATED_MIN_MATCHES ? ' skill-dim' : '';
+  const cls = p.skillCategory ? ' skill-' + SKILL_LABELS[p.skillCategory].toLowerCase() : '';
+  const label = p.skillCategory ? SKILL_LABELS[p.skillCategory] : 'Skill';
+  return `<button class="skill-chip${cls}${dim}" onclick="openSkillPicker('${p.name}',this)">${label}</button>`;
+}
+
+function openSkillPicker(name, btn) {
+  const p = state.players.find(x => x.name === name);
+  if (!p) return;
+  const matches = playerMatches(name);
+  document.getElementById('skill-picker-context').innerHTML = matches >= RATED_MIN_MATCHES
+    ? `<div class="skill-context">${esc(name)}: ${Math.round(playerRealRating(name))} from ${matches} matches. Already a real rating — only override if it feels wrong.</div>`
+    : '';
+  const opts = [
+    { key:'',             label:'Not categorized', sub:'uses real rating',            color:'#d5d5d0' },
+    { key:'beginner',     label:'Beginner',         sub:'~'+SKILL_ANCHORS.beginner,     color:'#166534' },
+    { key:'intermediate', label:'Intermediate',     sub:'~'+SKILL_ANCHORS.intermediate, color:'#0369a1' },
+    { key:'advanced',     label:'Advanced',         sub:'~'+SKILL_ANCHORS.advanced,     color:'#5b4fcf' },
+  ];
+  document.getElementById('skill-picker-opts').innerHTML = opts.map(o => `<button class="skill-opt" onclick="setSkillCategory('${name}','${o.key}')">
+      <span class="skill-dot" style="background:${o.color}"></span>${o.label}
+      <span style="margin-left:auto;font-size:12px;color:#bbb;font-weight:600">${o.sub}</span>${(p.skillCategory||'')===o.key?' ✓':''}</button>`).join('');
+  const picker = document.getElementById('skill-picker');
+  const r = btn.getBoundingClientRect();
+  picker.style.left = Math.max(8, Math.min(r.left - 60, window.innerWidth - 240)) + 'px';
+  picker.style.top  = Math.min(r.bottom + 6, window.innerHeight - 340) + 'px';
+  picker.style.display = 'block';
+}
+
+function setSkillCategory(name, cat) {
+  document.getElementById('skill-picker').style.display = 'none';
+  const p = state.players.find(x => x.name === name);
+  const val = cat || null;
+  if (!p || p.skillCategory === val) return;
+  p.skillCategory = val;
+  save();
+  if (state.round > 0) { regenerateSchedule(); renderCourts(); renderPlayerListGame(); }
+  else renderSetup();
+}
+
+document.addEventListener('click', e => {
+  const p = document.getElementById('skill-picker');
+  if (p && p.style.display !== 'none' && !p.contains(e.target) && !e.target.classList.contains('skill-chip')) {
+    p.style.display = 'none';
+  }
+}, true);
+
 // Teams are hard constraints, so some combinations genuinely can't be seated: a team
 // can only hold one side per court. Say so at setup instead of quietly leaving a
 // court short at round 1.
@@ -2201,6 +2303,7 @@ function renderSetup() {
     <div class="player-row">
       ${avatarHtml(p)}
       <div class="player-name">${p.name}</div>
+      ${skillChipHtml(p)}
       ${teamChipHtml(p)}
       ${genderChipHtml(p)}
       <button class="btn-icon" onclick="removePlayerSetup(${i})">✕</button>
@@ -2252,7 +2355,7 @@ function sessionLabel() {
   return nm ? nm + ' • Singles' : 'Singles';
 }
 
-function startGame() {
+async function startGame(e) {
   const err = document.getElementById('start-error');
   state.gameMode = setupMode;
   const minP = perCourt();
@@ -2260,6 +2363,9 @@ function startGame() {
   const feas = teamFeasibility(state.players, setupCourts, setupMode);
   if (feas && feas.level === 'error') { err.textContent = feas.msg; err.style.display='block'; return; }
   err.style.display = 'none';
+  const btn = e.target;
+  btn.textContent = 'Generating…'; btn.disabled = true;
+  await ensureRatingsLoaded();   // one-time snapshot; the rest of the session runs offline
   state.maxCourts = setupCourts;
   state.isRated = setupRated;
   state.sessionName = document.getElementById('session-name-input').value.trim();
@@ -2279,6 +2385,7 @@ function startGame() {
   regenerateSchedule(11); // round 1 + 11 upcoming = 12 planned rounds
   save();
   syncRosterFromSession();   // best-effort; never blocks the game starting
+  btn.textContent = 'Generate Matches'; btn.disabled = false;
 }
 
 // ── SHUFFLE ALGORITHM ────────────────────────────────────────────────────────
@@ -2298,6 +2405,16 @@ function pairKey(a, b) { return [a,b].sort().join('|'); }
 let simHist = null;
 function getPartnerCount(a, b) { return (simHist ? simHist.partnerHistory : state.partnerHistory)[pairKey(a,b)] || 0; }
 function getOpponentCount(a, b) { return (simHist ? simHist.opponentHistory : state.opponentHistory)[pairKey(a,b)] || 0; }
+
+// Ratings are frozen at session start (see ensureRatingsLoaded) so the rest of the
+// session's shuffling stays synchronous and offline-friendly. A player absent from
+// the map — brand new, or never rated — is treated as perfectly average.
+function getRating(name) {
+  const p = state.players.find(x => x.name === name);
+  if (p && p.skillCategory) return SKILL_ANCHORS[p.skillCategory];
+  const r = state.playerRatings[name];
+  return r === undefined ? ELO_START : r;
+}
 
 function teamGender(team) { // team: array of player objects → 'M' | 'F' | 'X' (mixed)
   if (team.every(p => p.gender === 'F')) return 'F';
@@ -2439,12 +2556,26 @@ function formPairsGreedy(players) {
   return pairs;
 }
 
+// How much one point of average-rating gap between two sides costs, in the same units
+// as the ±3/±2 partner/opponent-variety terms below and W_PARTNER_REPEAT further down.
+// Calibrated so one repeat OPPONENT (worth 2) is roughly worth a 15-point gap, and one
+// repeat PARTNER (W_PARTNER_REPEAT, worth 30) is roughly worth a 220-point gap —
+// basically never, since gaps this large are rare even at their most lopsided. Both
+// ratios come from real-session testing (see rating-balance mockup discussion):
+// avoiding a repeat should cost accepting a noticeably worse gap, not a token one.
+const RATING_GAP_WEIGHT = 0.13;
+// A repeat partnership costs 30x a single rating point — see RATING_GAP_WEIGHT above.
+const W_PARTNER_REPEAT = 30;
+
+function avgRating(team) { return team.reduce((s,p) => s + getRating(p.name), 0) / team.length; }
+
 function courtMatchScore(p1, p2) {
   let score = 0;
   p1.forEach(a => p2.forEach(b => {
     score += getPartnerCount(a.name, b.name) * 3;
     score -= getOpponentCount(a.name, b.name) * 2;
   }));
+  score -= Math.abs(avgRating(p1) - avgRating(p2)) * RATING_GAP_WEIGHT;
   // Doubles balance: an all-female pair never faces an all-male pair
   if (p1.length === 2 && p2.length === 2) {
     const g1 = teamGender(p1), g2 = teamGender(p2);
@@ -2540,7 +2671,7 @@ function bestFullArrangement(players) {
   let best = null, bestCost = Infinity;
   candidates.slice(0, PAIRING_CANDIDATE_LIMIT).forEach(({ pairs, repeatCost }) => {
     const { courts, score } = bestCourtAssignment(pairs);
-    const totalCost = repeatCost - score; // courtMatchScore is maximised; flip sign to combine
+    const totalCost = repeatCost * W_PARTNER_REPEAT - score; // courtMatchScore is maximised; flip sign to combine
     if (totalCost < bestCost) { bestCost = totalCost; best = courts; }
   });
   return best || [];
@@ -2876,15 +3007,17 @@ function quickAddPlayer() {
   const inp = document.getElementById('quick-add-input');
   const name = inp.value.trim();
   if (!name) return;
-  if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
-  state.players.push({ name, gender:'M', team:0, score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
+  if (state.players.some(p => nameKey(p.name) === nameKey(name))) { alert('Player already exists'); return; }
+  // Known player: take the roster's saved spelling and gender, not what was typed.
+  const known = (rosterCache||[]).find(p => nameKey(p.name) === nameKey(name));
+  state.players.push({ name: known ? known.name : name, gender: known ? known.gender : 'M', team:0, skillCategory:null, score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
   inp.value = '';
   document.getElementById('quick-add-row').style.display = 'none';
   regenerateSchedule();
   renderAbsentToggles();
   renderLeaderboard();
   save();
-  document.getElementById('round-banner-text').textContent = `${name} added — they'll join the next round.`;
+  document.getElementById('round-banner-text').textContent = `${known ? known.name : name} added — they'll join the next round.`;
   document.getElementById('round-banner').style.display = 'flex';
 }
 
@@ -3210,8 +3343,10 @@ function addPlayerMidGame() {
   const inp = document.getElementById('new-player-game-input');
   const name = inp.value.trim();
   if (!name) return;
-  if (state.players.find(p=>p.name===name)) { alert('Player already exists'); return; }
-  state.players.push({ name, gender:'M', team:0, score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
+  if (state.players.some(p => nameKey(p.name) === nameKey(name))) { alert('Player already exists'); return; }
+  // Known player: take the roster's saved spelling and gender, not what was typed.
+  const known = (rosterCache||[]).find(p => nameKey(p.name) === nameKey(name));
+  state.players.push({ name: known ? known.name : name, gender: known ? known.gender : 'M', team:0, skillCategory:null, score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
   inp.value = '';
   regenerateSchedule();
   renderPlayerListGame(); renderAbsentToggles(); renderLeaderboard(); save();
@@ -3236,6 +3371,7 @@ function renderPlayerListGame() {
     <div class="player-row">
       ${avatarHtml(p)}
       <div class="player-name">${p.name}</div>
+      ${skillChipHtml(p)}
       ${teamChipHtml(p)}
       ${genderChipHtml(p)}
       <span class="player-score">${p.score} pts</span>
@@ -3271,7 +3407,7 @@ function finishSession() {
 
 function resetGame() {
   if (!confirm('Reset everything and start a new game?')) return;
-  state = { players:[], round:0, maxCourts:1, sessionName:'', gameMode:'doubles', schedule:[], bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, absentNext:new Set() };
+  state = { players:[], round:0, maxCourts:1, sessionName:'', gameMode:'doubles', schedule:[], bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, playerRatings:{}, absentNext:new Set() };
   save(); location.reload();
 }
 
@@ -3573,7 +3709,7 @@ function newSessionFromMenu() {
   document.getElementById('menu-btn').style.display = 'flex';
   document.getElementById('phase-badge').textContent = 'Setup';
   document.getElementById('phase-badge').className = 'badge badge-setup';
-  state = { players:[], round:0, maxCourts:1, sessionName:'', gameMode:'doubles', schedule:[], bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, absentNext:new Set() };
+  state = { players:[], round:0, maxCourts:1, sessionName:'', gameMode:'doubles', schedule:[], bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, playerRatings:{}, absentNext:new Set() };
   setupCourts = 1; setupMode = 'doubles'; setupRated = true;
   document.getElementById('courts-count-display').textContent = setupCourts;
   document.getElementById('session-name-input').value = '';
@@ -3582,8 +3718,10 @@ function newSessionFromMenu() {
   rosterShowAll = false;
   renderSetup();
   save();
-  // Roster is a convenience, so it loads in the background — setup is usable immediately.
+  // Roster and league are conveniences, so both load in the background — setup is
+  // usable immediately, and picks up real ratings/match counts once they land.
   loadRoster().then(renderRosterPicker);
+  loadLeagueSnapshot();
 }
 
 function resumeSession() {
@@ -3597,6 +3735,7 @@ function resumeSession() {
   document.querySelector('header h1').textContent = '🎾 Tennis Mabar App';
   updateShareUI();
   switchTab('courts');
+  loadLeagueSnapshot();
 }
 
 // Opening a session from a list reuses the existing ?code= viewer — one mechanism
@@ -3887,6 +4026,21 @@ async function getLeague(force) {
   const sessions = await fetchSessionsForRating();
   _leagueCache = computeLeague(sessions);
   return _leagueCache;
+}
+
+// Snapshots every player's current all-time rating into state.playerRatings so the
+// shuffle (getRating) can run synchronously for the rest of the session — ratings
+// don't move again mid-session even as real match results come in. If the fetch fails
+// (offline at courtside), leave whatever's already cached; getRating falls back to
+// ELO_START per player either way, so the session still starts, just without a rating
+// signal to balance on.
+async function ensureRatingsLoaded() {
+  try {
+    const league = await getLeague();
+    state.playerRatings = Object.assign({}, league.allTime.rating);
+  } catch(e) {
+    console.warn('Could not load ratings, starting with defaults:', e);
+  }
 }
 
 // Rating movement for the session currently on screen. Loaded in the background so the
