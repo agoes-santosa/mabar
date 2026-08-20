@@ -25,7 +25,7 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 - **Rating-balanced shuffling** — court matchups also weigh each player's current all-time rating, so a lopsided rank #1-and-#2-vs-#19-and-#20 pairing is avoided where a fairer option exists. Lowest priority of all the shuffle rules — team and gender constraints are unaffected, and a fresh partnership always wins over a better rating gap; rating only decides between options that are otherwise equally good on history. New or never-played players default to the average rating (1000) unless given a **Skill** chip (Setup screen and Players tab, next to Team) — Beginner / Intermediate / Advanced substitute a representative rating for whoever the computed one doesn't do justice to. Set per session, not saved to the roster, and works for established players too — dimmed once someone has 10+ real matches as a hint it's probably not needed, but exactly as tappable, and a manually-set category always wins over the computed rating with no automatic cutoff.
 - **Flexible courts** — set 1 to 6 courts at the start; the app fills them optimally each round.
 - **Four sort modes** — view standings by **Raw Pts** (games won), **Win %** (wins ÷ courts played), **Pts %** (points scored ÷ maximum possible), or **Match Pts** (a flat 2 points for a win, 1 for a loss — rewards winning the match itself over the scoreline). Available in both the in-game Standings tab and the Summary screen. Exact ties (same value on the active mode) are broken automatically by point differential — total games won minus games lost across the session.
-- **Small-sample protection** — in Win % and Pts % mode, players need at least the median number of rounds played (among everyone who's played) to rank in the top 3. A player who joined late and went 1-for-1 won't out-rank someone with a full, proven record — they still appear in the list with their real stats, just not on the podium. Raw Pts and Match Pts are unaffected, since both already reward playing more rounds.
+- **Small-sample protection** — in Win % and Pts % mode, players need to be within one round of the median rounds played (among everyone who's played) to rank in the top 3. A player only one round behind the pack still competes on their real stats, but someone who joined late and went 1-for-1 still won't out-rank a full, proven record — they always appear in the list with their real stats, just not on the podium if they fall short. Raw Pts and Match Pts are unaffected, since both already reward playing more rounds.
 - **Live standings** — leaderboard updates after every round, with full round-by-round history.
 - **Score & player editing** — correct any score, or even *who actually played*, in any past round — mid-session or from the Summary screen; all stats recalculate automatically.
 - **Player management** — mark absences before a round, swap players between courts and the sitting-out bench, or add players mid-session.
@@ -180,6 +180,17 @@ open index.html   # macOS
 ---
 
 ## Changelog
+
+### v3.8 (August 2026)
+
+**Fixed: exported/shared summary image could be missing ratings**
+- The summary screen renders once immediately when a session finishes — before ratings have loaded from Firestore — then re-renders in the background a few seconds later once they arrive. That's why the on-screen card eventually looked right, but the *exported* image didn't: the PNG canvas was generated once and cached, and nothing invalidated that cache when the ratings finished loading. Downloading or sharing early froze the export at the "no rating yet" state permanently, even though the on-screen card went on to correct itself. Session History was never affected, since it's opened well after ratings have already synced.
+- Fixed two ways: the canvas cache now clears itself when the rating fetch lands, so a later Download/Share reflects the corrected data; and Download/Share now wait for the in-flight rating fetch to finish before capturing at all, instead of racing it.
+
+**Small-sample protection loosened by one round**
+- Win % / Pts % ranking previously required playing *at least* the exact median number of rounds to be podium-eligible — so a player just one round behind the pack (e.g. 5 played when the median was 6) got auto-demoted below everyone else regardless of their actual win rate.
+- The bar is now median − 1, so someone only one round short of the group still competes on their real stats. Still enough to keep a genuinely small sample (e.g. two rounds played) out of medal contention.
+- Verified by replaying the exact round counts and win rates from a real session (8 players, rounds played 2/5/5/6/6/6/7/7): a 75% player on 5 rounds now correctly ranks #3 instead of being pushed to #7 below a 71% player who'd played 6.
 
 ### v3.7 (August 2026)
 

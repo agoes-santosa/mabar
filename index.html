@@ -1393,7 +1393,7 @@ function renderPlayerSummary(s, when) {
 
   renderPvSummaryBoard();
   pvApplyBgPhoto();
-  loadSessionRatings(pvCode || s.sessionCode, renderPvSummaryBoard);
+  _sessionRatingsPromise = loadSessionRatings(pvCode || s.sessionCode, function(){ pvCachedCanvas = null; renderPvSummaryBoard(); });
   if (navigator.share || navigator.canShare) document.getElementById('pv-btn-share').style.display = 'flex';
 }
 
@@ -1536,6 +1536,7 @@ function pvSetBgPhotoY(val) {
 
 async function pvGetCanvas() {
   if (pvCachedCanvas) return pvCachedCanvas;
+  if (_sessionRatingsPromise) { try { await _sessionRatingsPromise; } catch(e){} }
   // null means "transparent" to html2canvas, not "default fill" — matches the wrapper's
   // own inline background (set in pvApplyBgPhoto). html2canvas rounds its canvas height
   // up from the element's fractional CSS height, and that extra sub-pixel row falls back
@@ -3103,15 +3104,17 @@ function medianPlayed(players) {
   return counts.length % 2 ? counts[mid] : (counts[mid-1] + counts[mid]) / 2;
 }
 
-// Ranks players who've played at least the median number of rounds first (sorted
-// by cmp among themselves), then everyone below that bar after (also sorted by cmp).
-// Guarantees the podium never highlights a small, lucky sample over a proven one,
-// while still showing every player with their real stats.
+// Ranks players who've played at least (median - 1) rounds first (sorted by cmp among
+// themselves), then everyone below that bar after (also sorted by cmp). The one-round
+// tolerance below the exact median exists because sitting out is round-robin, not a
+// performance signal — someone who's sat out one extra round shouldn't be auto-demoted
+// below the pack on round count alone. Guarantees the podium never highlights a small,
+// lucky sample over a proven one, while still showing every player with their real stats.
 function sortWithQualification(cmp, players) {
   players = players || state.players;
-  const median = medianPlayed(players);
-  const qualified = players.filter(p => p.courtsPlayed >= median);
-  const rest = players.filter(p => p.courtsPlayed < median);
+  const bar = Math.max(1, medianPlayed(players) - 1);
+  const qualified = players.filter(p => p.courtsPlayed >= bar);
+  const rest = players.filter(p => p.courtsPlayed < bar);
   return [...qualified.sort(cmp), ...rest.sort(cmp)];
 }
 
@@ -3451,7 +3454,7 @@ function renderSummary() {
   document.getElementById('sum-points').textContent = totalPts;
   renderSummaryBoard();
   applyBgPhoto();
-  loadSessionRatings(state.sessionCode, renderSummaryBoard);
+  _sessionRatingsPromise = loadSessionRatings(state.sessionCode, function(){ cachedCanvas = null; renderSummaryBoard(); });
   if (navigator.share||navigator.canShare) document.getElementById('btn-share').style.display='flex';
 }
 
@@ -3596,6 +3599,7 @@ async function withBakedBg(bgDiv, photo, photoY, fn) {
 let cachedCanvas = null;
 async function getCanvas() {
   if (cachedCanvas) return cachedCanvas;
+  if (_sessionRatingsPromise) { try { await _sessionRatingsPromise; } catch(e){} }
   cachedCanvas = await withBakedBg(document.getElementById('summary-bg-div'), state.bgPhoto, state.bgPhotoY, () =>
     html2canvas(document.getElementById('summary-capture'), { scale:2, backgroundColor: state.bgPhoto ? null : '#f5f5f3', useCORS:true, logging:false }));
   return cachedCanvas;
@@ -4047,6 +4051,7 @@ async function ensureRatingsLoaded() {
 // summary paints instantly and works offline; the rating column appears when it lands.
 let _sessionRatings = null;
 let _sessionRatingsLoadingFor = null;  // dedupes concurrent calls for the same code
+let _sessionRatingsPromise = null;     // export/share await this so they don't capture before the first fetch lands
 async function loadSessionRatings(code, rerender, isRetry) {
   if (!code) return;
   if (!isRetry) {
