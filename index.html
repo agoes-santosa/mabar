@@ -331,6 +331,11 @@
   .ms-modes { display: flex; gap: 4px; background: #ebebe7; border-radius: 11px; padding: 3px; margin-bottom: .875rem; }
   .ms-mode { flex: 1; border: none; background: none; border-radius: 8px; padding: 9px 6px; font-size: 13.5px; font-weight: 700; color: #888; cursor: pointer; }
   .ms-mode.active { background: #fff; color: #5b4fcf; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  /* Gender filter: same pill component, one size down, so it reads as refining the
+     This month/All time row above it rather than a second, competing control. */
+  .ms-modes-sub { margin-bottom: .625rem; }
+  .ms-modes-sub .ms-mode { font-size: 12.5px; padding: 7px 6px; }
+  .ms-modes-sub .ms-mode .mk { opacity: .7; margin-right: 3px; }
   .ms-alt { font-size: 11px; color: #aaa; font-weight: 600; margin-top: 2px; }
   .ms-picker { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 0.5px solid #e5e5e0; border-radius: 14px; padding: .6rem .7rem; margin-bottom: .875rem; }
   .ms-picker-btn { background: #f0f0ec; border: none; border-radius: 10px; width: 38px; height: 38px; font-size: 17px; color: #5b4fcf; cursor: pointer; flex-shrink: 0; }
@@ -1234,8 +1239,20 @@ function pvScore(val) {
 }
 
 let pvLiveSession = null;
+let pvLiveRound = null;
+let pvLiveSortMode = 'points';
+
+// Mirrors setSortMode/setPlayerViewSort's naming, but for the live (not-yet-finished)
+// spectator view specifically — its own mode so a spectator's choice while a session is
+// still running doesn't leak into or get clobbered by the finished-summary sort.
+function pvSetLiveSort(mode) {
+  pvLiveSortMode = mode;
+  if (pvLiveSession) renderPlayerLive(pvLiveSession, pvLiveRound);
+}
+
 function renderPlayerLive(s, round) {
   pvLiveSession = s;
+  pvLiveRound = round;
   // This whole screen is rebuilt from scratch on every live update (a new round, an
   // edited score, anything), which would otherwise snap an open Round History dropdown
   // shut mid-read every time someone else's action comes in — so carry its open/closed
@@ -1243,7 +1260,7 @@ function renderPlayerLive(s, round) {
   const prevList = document.getElementById('pv-live-history-list');
   const historyWasOpen = !!prevList && prevList.style.display !== 'none';
 
-  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  const sorted = sortPlayersBy(pvLiveSortMode, s.players);
   const totalPts = s.players.reduce((t, p) => t + (p.score || 0), 0);
 
   let html = `
@@ -1285,16 +1302,48 @@ function renderPlayerLive(s, round) {
     </div>`;
   }
 
+  // Read-only mirror of the referee's own "Upcoming rounds" preview (state.schedule),
+  // synced through the same Firestore payload — so a spectator can see who's up next
+  // and plan a bathroom/minimarket run around it, not just what's on court right now.
+  if (s.schedule && s.schedule.length) {
+    html += `<div class="preview-card">
+      <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.25rem">Upcoming rounds</div>
+      ${s.schedule.map((r, i) => `
+        <div class="sched-round">
+          <div class="sched-head">
+            <span class="sched-label">Round ${(round || 0) + i + 1}</span>
+          </div>
+          ${r.courts.map(c => `
+            <div class="sched-court">
+              <div class="sched-team">${(c.team1 || []).join(' & ')}</div>
+              <span class="preview-sep">vs</span>
+              <div class="sched-team" style="text-align:right">${(c.team2 || []).join(' & ')}</div>
+            </div>`).join('')}
+          ${r.sittingOut && r.sittingOut.length ? `<div class="sched-rest">Resting: ${r.sittingOut.join(', ')}</div>` : ''}
+        </div>`).join('')}
+      <div style="font-size:11px;color:#bbb;margin-top:.5rem">Tentative — updates as absences, swaps &amp; scores come in.</div>
+    </div>`;
+  }
+
   html += `<div class="card" style="margin-bottom:.875rem">
-    <div class="card-title">Standings</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+      <span class="card-title" style="margin-bottom:0">Standings</span>
+      <div class="sort-toggle-row">
+        <button class="sort-btn${pvLiveSortMode==='points'?' active':''}" onclick="pvSetLiveSort('points')">Raw Pts</button>
+        <button class="sort-btn${pvLiveSortMode==='winrate'?' active':''}" onclick="pvSetLiveSort('winrate')">Win %</button>
+        <button class="sort-btn${pvLiveSortMode==='ptspct'?' active':''}" onclick="pvSetLiveSort('ptspct')">Pts %</button>
+        <button class="sort-btn${pvLiveSortMode==='matchpts'?' active':''}" onclick="pvSetLiveSort('matchpts')">Match Pts</button>
+      </div>
+    </div>
     ${sorted.map((p, i) => {
       const rc = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank';
+      const metric = pvLiveSortMode==='winrate' ? winRatePct(p) : pvLiveSortMode==='ptspct' ? pointPct(p) : pvLiveSortMode==='matchpts' ? matchPtsDisplay(p) : (p.score||0);
       return `<div class="leaderboard-row">
         <span class="rank ${rc}">${i + 1}</span>
         <div class="avatar" style="width:32px;height:32px;font-size:12px">${pvInitials(p.name)}</div>
         <span class="player-name">${p.name}</span>
         <span style="font-size:13px;color:#bbb;margin-right:6px">${p.courtsPlayed || 0} played</span>
-        <span class="player-score">${p.score || 0}</span>
+        <span class="player-score">${metric}</span>
       </div>`;
     }).join('')}
   </div>`;
@@ -3891,6 +3940,7 @@ const RATED_MIN_MATCHES = 10;   // roughly one session's worth of play
 
 let standingsMonths = [], standingsIdx = 0, standingsData = null, standingsPlayer = null;
 let standingsMode = 'month';   // 'month' (resets each month) | 'alltime' (never resets)
+let standingsGender = 'all';   // 'all' | 'M' | 'F' — filters which players rank, not how ratings are computed
 
 function monthKeyOf(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
 function monthLabelOf(key) {
@@ -4095,7 +4145,11 @@ async function showStandings() {
   const el = document.getElementById('standings-body');
   el.className = 'list-loading'; el.textContent = 'Loading…';
   try {
-    const sessions = await fetchSessionsForRating();
+    // Roster fetch never throws (loadRoster catches its own errors and just leaves
+    // rosterCache empty), so it's safe to run alongside the session fetch rather than
+    // gating the whole screen on it — the Men's/Women's filter just falls back to
+    // everyone defaulting M (same fallback the rest of the app uses) if it's missing.
+    const [sessions] = await Promise.all([fetchSessionsForRating(), loadRoster()]);
     if (!sessions.length) {
       el.className = 'list-empty';
       el.textContent = 'No finished rounds yet — play a session first.';
@@ -4109,7 +4163,7 @@ async function showStandings() {
       el.textContent = 'No rated sessions yet — casual sessions don\'t count toward standings.';
       return;
     }
-    standingsIdx = 0; standingsPlayer = null; standingsMode = 'month';
+    standingsIdx = 0; standingsPlayer = null; standingsMode = 'month'; standingsGender = 'all';
     el.className = '';
     renderStandings();
   } catch(e) {
@@ -4132,10 +4186,32 @@ function setStandingsMode(mode) {
   window.scrollTo({top:0});
 }
 
+// Filters which players appear in the ranked list — it does not change how anyone's
+// rating is computed (still one Elo number per player, from every match they've
+// played, mixed doubles included). "Women's #1" means the highest-rated woman, not
+// necessarily someone who's mostly faced other women.
+function setStandingsGender(g) {
+  standingsGender = g;
+  renderStandings();
+}
+
+// Looks up a player's gender from the club roster (the same source Setup/Players use),
+// defaulting to 'M' when the roster hasn't loaded or doesn't have them — same fallback
+// the rest of the app already uses for an unknown player (see quickAddPlayer et al).
+function standingsPlayerGender(name) {
+  const p = (rosterCache||[]).find(function(x){ return nameKey(x.name) === nameKey(name); });
+  return p ? p.gender : 'M';
+}
+
 function standingsModeToggle() {
   return '<div class="ms-modes">'
     + '<button class="ms-mode' + (standingsMode==='month'?' active':'') + '" onclick="setStandingsMode(\'month\')">This month</button>'
     + '<button class="ms-mode' + (standingsMode==='alltime'?' active':'') + '" onclick="setStandingsMode(\'alltime\')">All time</button>'
+    + '</div>'
+    + '<div class="ms-modes ms-modes-sub">'
+    +   '<button class="ms-mode' + (standingsGender==='all'?' active':'') + '" onclick="setStandingsGender(\'all\')">All</button>'
+    +   '<button class="ms-mode' + (standingsGender==='M'?' active':'') + '" onclick="setStandingsGender(\'M\')"><span class="mk">♂</span>Men\'s</button>'
+    +   '<button class="ms-mode' + (standingsGender==='F'?' active':'') + '" onclick="setStandingsGender(\'F\')"><span class="mk">♀</span>Women\'s</button>'
     + '</div>';
 }
 
@@ -4153,6 +4229,7 @@ function renderStandings() {
     const n = st.name;
     return {
       name: n,
+      gender: standingsPlayerGender(n),
       rating: monthly ? m.rating[n] : at.rating[n],
       // the other number, shown small underneath
       alt: monthly ? (at.rating[n] === undefined ? null : at.rating[n]) : null,
@@ -4163,7 +4240,7 @@ function renderStandings() {
       winPct: st.matches ? Math.round(st.wins / st.matches * 100) : 0,
       ptsPct: st.maxp ? Math.round(st.pf / st.maxp * 100) : 0
     };
-  });
+  }).filter(function(r){ return standingsGender === 'all' || r.gender === standingsGender; });
 
   const byRating = function(a,b){ return b.rating - a.rating || a.name.localeCompare(b.name); };
   const ranked   = rows.filter(function(r){ return r.matches >= RATED_MIN_MATCHES; }).sort(byRating);
@@ -4180,6 +4257,7 @@ function renderStandings() {
       + '<div class="ms-rank">' + (showRank ? (i+1) : '–') + '</div>'
       + '<div class="ms-main">'
       +   '<div class="ms-name">' + esc(r.name)
+      +     (r.gender === 'F' ? ' <span class="fem-mark">♀</span>' : '')
       +     (r.allTimeMatches < RATED_MIN_MATCHES ? '<span class="ms-prov">provisional</span>' : '') + '</div>'
       +   '<div class="ms-meta">' + r.winPct + '% win · ' + r.ptsPct + '% pts · '
       +     r.matches + ' match' + (r.matches===1?'':'es') + ' · ' + r.sessions + ' session' + (r.sessions===1?'':'s') + '</div>'
@@ -4209,7 +4287,9 @@ function renderStandings() {
     +   '<button class="roster-manage-link" style="padding-top:0" onclick="openRatingExplain()">Explanation on ratings</button>'
     + '</div>'
     + (ranked.length ? ranked.map(function(r,i){ return row(r,i,true); }).join('')
-                     : '<div class="list-empty">Nobody has reached ' + RATED_MIN_MATCHES + ' matches yet.</div>')
+                     : '<div class="list-empty">' + (rows.length
+                         ? 'Nobody has reached ' + RATED_MIN_MATCHES + ' matches yet.'
+                         : 'No players in this group yet.') + '</div>')
     + (unranked.length
         ? '<div class="ms-group">Not enough matches to rank</div>' + unranked.map(function(r){ return row(r,0,false); }).join('')
         : '');
