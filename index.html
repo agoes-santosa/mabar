@@ -98,7 +98,12 @@
   .gender-chip { border: none; border-radius: 20px; font-size: 12px; font-weight: 700; min-width: 40px; min-height: 30px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; }
   .gender-chip.g-m { background: #e0f2fe; color: #0369a1; }
   .gender-chip.g-f { background: #fce7f3; color: #be185d; }
-  .fem-mark { color: #db2777; font-size: 11px; font-weight: 700; vertical-align: middle; }
+  .fem-mark { color: #db2777; }
+  /* Drawn as SVG, not the Unicode ♂/♀ glyphs — different platforms fall back to
+     different symbol fonts for those two characters, with wildly inconsistent
+     internal glyph-vs-em-box positioning (fine on desktop, visibly sunken on iOS).
+     An SVG has an explicit box, so vertical-align behaves identically everywhere. */
+  .gender-icon { width: 0.75em; height: 0.75em; vertical-align: middle; }
   .team-chip { border: none; border-radius: 20px; font-size: 12px; font-weight: 700; min-width: 40px; min-height: 30px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; background: #f0f0ec; color: #999; }
   .team-mark { font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 6px; color: #fff; vertical-align: 1px; }
   #team-picker { position: fixed; background: #fff; border-radius: 12px; border: 0.5px solid #e5e5e0; padding: 6px; box-shadow: 0 4px 24px rgba(0,0,0,0.15); z-index: 150; min-width: 160px; }
@@ -1755,7 +1760,7 @@ function renderRosterPicker() {
     + '<div class="roster-label">' + (searching ? 'Roster matches' : 'Tap to add from roster') + '</div>'
     + '<div class="roster-chips">' + shown.map(function(p){
         return '<button class="roster-chip" onclick="addFromRoster(\'' + p.id + '\')">'
-             + esc(p.name) + '<span class="rc-g">' + (p.gender==='F'?'♀':'♂') + '</span></button>';
+             + esc(p.name) + '<span class="rc-g">' + genderIconSvg(p.gender==='F'?'F':'M') + '</span></button>';
       }).join('') + '</div>'
     + (!searching && others.length
         ? '<button class="roster-more" onclick="rosterShowAll=!rosterShowAll;renderRosterPicker()">'
@@ -2186,7 +2191,7 @@ async function confirmMerge(targetId) {
 
 function genderChipHtml(p) {
   const isF = p.gender === 'F';
-  return `<button class="gender-chip ${isF?'g-f':'g-m'}" onclick="toggleGender('${p.name}')">${isF?'♀ F':'♂ M'}</button>`;
+  return `<button class="gender-chip ${isF?'g-f':'g-m'}" onclick="toggleGender('${p.name}')">${genderIconSvg(isF?'F':'M')} ${isF?'F':'M'}</button>`;
 }
 
 function toggleGender(name) {
@@ -2215,13 +2220,24 @@ function pushGenderToRoster(name, gender) {
     .catch(function(){ /* not in the roster yet — it'll be created with the right gender at startGame */ });
 }
 
+// Drawn by hand rather than using the Unicode ♂/♀ characters — those two glyphs fall
+// back to a different symbol font on every platform, each with its own idea of where
+// the glyph sits inside its em-box, so no amount of vertical-align tuning lines them
+// up with surrounding text consistently (fine on desktop, visibly sunken on iOS). An
+// SVG has an explicit box instead, so `.gender-icon`'s vertical-align actually holds.
+function genderIconSvg(gender) {
+  return gender === 'F'
+    ? '<svg class="gender-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="5.5"/><line x1="12" y1="14" x2="12" y2="21"/><line x1="8.5" y1="17.5" x2="15.5" y2="17.5"/></svg>'
+    : '<svg class="gender-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="14.5" r="5.5"/><line x1="13.5" y1="10.5" x2="19" y2="5"/><polyline points="13.5,5 19,5 19,10.5"/></svg>';
+}
+
 // Female names get a small ♀ so gender balance is visible on courts, and teamed
 // players get a coloured team tag so you can see the draw respected the pairing.
 function nameHtml(name) {
   const p = state.players.find(x=>x.name===name);
   if (!p) return name;
   let out = name;
-  if (p.gender === 'F') out += ' <span class="fem-mark">♀</span>';
+  if (p.gender === 'F') out += ' <span class="fem-mark">' + genderIconSvg('F') + '</span>';
   if (p.team) out += ` <span class="team-mark" style="background:${teamColor(p.team)}">T${p.team}</span>`;
   return out;
 }
@@ -4318,8 +4334,8 @@ function standingsModeToggle() {
     + '</div>'
     + '<div class="ms-modes ms-modes-sub">'
     +   '<button class="ms-mode' + (standingsGender==='all'?' active':'') + '" onclick="setStandingsGender(\'all\')">All</button>'
-    +   '<button class="ms-mode' + (standingsGender==='M'?' active':'') + '" onclick="setStandingsGender(\'M\')"><span class="mk">♂</span>Men\'s</button>'
-    +   '<button class="ms-mode' + (standingsGender==='F'?' active':'') + '" onclick="setStandingsGender(\'F\')"><span class="mk">♀</span>Women\'s</button>'
+    +   '<button class="ms-mode' + (standingsGender==='M'?' active':'') + '" onclick="setStandingsGender(\'M\')"><span class="mk">' + genderIconSvg('M') + '</span>Men\'s</button>'
+    +   '<button class="ms-mode' + (standingsGender==='F'?' active':'') + '" onclick="setStandingsGender(\'F\')"><span class="mk">' + genderIconSvg('F') + '</span>Women\'s</button>'
     + '</div>';
 }
 
@@ -4365,7 +4381,7 @@ function renderStandings() {
       + '<div class="ms-rank">' + (showRank ? (i+1) : '–') + '</div>'
       + '<div class="ms-main">'
       +   '<div class="ms-name">' + esc(r.name)
-      +     (r.gender === 'F' ? ' <span class="fem-mark">♀</span>' : '')
+      +     (r.gender === 'F' ? ' <span class="fem-mark">' + genderIconSvg('F') + '</span>' : '')
       +     (r.allTimeMatches < RATED_MIN_MATCHES ? '<span class="ms-prov">provisional</span>' : '') + '</div>'
       +   '<div class="ms-meta">' + r.winPct + '% win · ' + r.ptsPct + '% pts · '
       +     r.matches + ' match' + (r.matches===1?'':'es') + ' · ' + r.sessions + ' session' + (r.sessions===1?'':'s') + '</div>'
