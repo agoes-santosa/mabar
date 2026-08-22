@@ -98,7 +98,7 @@
   .gender-chip { border: none; border-radius: 20px; font-size: 12px; font-weight: 700; min-width: 40px; min-height: 30px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; }
   .gender-chip.g-m { background: #e0f2fe; color: #0369a1; }
   .gender-chip.g-f { background: #fce7f3; color: #be185d; }
-  .fem-mark { color: #db2777; font-size: 11px; font-weight: 700; }
+  .fem-mark { color: #db2777; font-size: 11px; font-weight: 700; vertical-align: middle; }
   .team-chip { border: none; border-radius: 20px; font-size: 12px; font-weight: 700; min-width: 40px; min-height: 30px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; background: #f0f0ec; color: #999; }
   .team-mark { font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 6px; color: #fff; vertical-align: 1px; }
   #team-picker { position: fixed; background: #fff; border-radius: 12px; border: 0.5px solid #e5e5e0; padding: 6px; box-shadow: 0 4px 24px rgba(0,0,0,0.15); z-index: 150; min-width: 160px; }
@@ -335,7 +335,7 @@
      This month/All time row above it rather than a second, competing control. */
   .ms-modes-sub { margin-bottom: .625rem; }
   .ms-modes-sub .ms-mode { font-size: 12.5px; padding: 7px 6px; }
-  .ms-modes-sub .ms-mode .mk { opacity: .7; margin-right: 3px; }
+  .ms-modes-sub .ms-mode .mk { opacity: .7; margin-right: 3px; vertical-align: middle; }
   .ms-alt { font-size: 11px; color: #aaa; font-weight: 600; margin-top: 2px; }
   .ms-picker { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 0.5px solid #e5e5e0; border-radius: 14px; padding: .6rem .7rem; margin-bottom: .875rem; }
   .ms-picker-btn { background: #f0f0ec; border: none; border-radius: 10px; width: 38px; height: 38px; font-size: 17px; color: #5b4fcf; cursor: pointer; flex-shrink: 0; }
@@ -540,6 +540,7 @@
             <input type="text" id="quick-add-input" placeholder="New player name" onkeydown="if(event.key==='Enter')quickAddPlayer()" style="font-size:16px" />
             <button class="btn btn-primary btn-sm" onclick="quickAddPlayer()">Add</button>
           </div>
+          <div id="quick-name-warning"></div>
         </div>
       </div>
 
@@ -578,6 +579,7 @@
           <input type="text" id="new-player-game-input" placeholder="Add player mid-game" onkeydown="if(event.key==='Enter')addPlayerMidGame()" />
           <button class="btn btn-primary btn-sm" onclick="addPlayerMidGame()">Add</button>
         </div>
+        <div id="game-name-warning"></div>
       </div>
       <button class="btn btn-danger btn-sm" onclick="resetGame()">Reset / new game</button>
       <div style="height:.5rem"></div>
@@ -1828,6 +1830,41 @@ async function syncRosterFromSession() {
   catch(e) { console.warn('Roster sync failed:', e); }
 }
 
+// Shared "is this really a new person, or an existing one under a slightly different
+// spelling?" check — Setup's own addPlayer() has always done this; mid-session adds
+// (below) previously didn't, which is exactly how a typo like "Lukas" next to an
+// existing "Lucas" turned into two disconnected identities instead of a warning.
+// Exact spelling silently reuses the roster's canonical name/gender; a name that's
+// merely close to an existing one asks first; anything else is genuinely new.
+function resolvePlayerAdd(raw) {
+  const exact = (rosterCache||[]).find(function(p){ return nameKey(p.name) === nameKey(raw); });
+  if (exact) return { type:'exact', name:exact.name, gender:exact.gender };
+  const near = similarRosterNames(raw);
+  if (near.length) return { type:'near', near:near };
+  return { type:'new', name:raw, gender:'M' };
+}
+
+// Upserts a single player into the shared roster immediately. syncRosterFromSession()
+// above only ever runs once, at Generate Matches — anyone added after that (mid-session,
+// via either add flow below) would otherwise never get a roster document at all: not
+// visible in the roster picker next time, and not visible in Manage Roster if their
+// name ever needs fixing. Best-effort, same as the bulk sync — never blocks the add.
+async function syncOnePlayerToRoster(name, gender) {
+  if (rosterError) return;
+  const k = nameKey(name);
+  if (!k) return;
+  const existing = (rosterCache||[]).find(function(p){ return nameKey(p.name) === k; });
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+  try {
+    if (existing) {
+      await rosterRef().doc(existing.id).set({ sessionCount:(existing.sessionCount||0)+1, lastPlayedAt:now, gender: gender || existing.gender }, { merge:true });
+    } else {
+      await rosterRef().doc(k).set({ name:name, gender:gender||'M', sessionCount:1, lastPlayedAt:now, createdAt:now });
+    }
+    await loadRoster();
+  } catch(e) { console.warn('Roster sync failed:', e); }
+}
+
 // ── MANAGE ROSTER: RENAME & MERGE ────────────────────────────────────────────
 // Renaming and merging are the same operation on the data — rewrite every occurrence
 // of one name to another across all sessions. They differ only in the roster
@@ -3050,25 +3087,61 @@ function toggleQuickAdd() {
   const row = document.getElementById('quick-add-row');
   const visible = row.style.display === 'block';
   row.style.display = visible ? 'none' : 'block';
+  renderQuickNameWarning(null);   // don't carry a stale "did you mean" into the next open
   if (!visible) setTimeout(() => document.getElementById('quick-add-input').focus(), 50);
 }
 
 function quickAddPlayer() {
   const inp = document.getElementById('quick-add-input');
-  const name = inp.value.trim();
-  if (!name) return;
-  if (state.players.some(p => nameKey(p.name) === nameKey(name))) { alert('Player already exists'); return; }
-  // Known player: take the roster's saved spelling and gender, not what was typed.
-  const known = (rosterCache||[]).find(p => nameKey(p.name) === nameKey(name));
-  state.players.push({ name: known ? known.name : name, gender: known ? known.gender : 'M', team:0, skillCategory:null, score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
-  inp.value = '';
+  const raw = inp.value.trim();
+  if (!raw) return;
+  if (state.players.some(p => nameKey(p.name) === nameKey(raw))) { alert('Player already exists'); return; }
+  const res = resolvePlayerAdd(raw);
+  if (res.type === 'near') { renderQuickNameWarning({ typed: raw, near: res.near }); return; }
+  finishQuickAdd(res.name, res.gender);
+}
+
+function renderQuickNameWarning(info) {
+  const el = document.getElementById('quick-name-warning');
+  if (!el) return;
+  if (!info) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="name-warn">A similar name is already in the roster. '
+    + 'Adding a new one creates a separate person, which would split their league record.'
+    + '<div class="name-warn-actions">'
+    + info.near.map(function(p){
+        return '<button class="name-warn-btn" onclick="addFromRosterQuick(\'' + p.id + '\')">Use ' + esc(p.name) + '</button>';
+      }).join('')
+    + '<button class="name-warn-btn secondary" onclick="forceQuickAddNew()">Add “' + esc(info.typed) + '” as new</button>'
+    + '</div></div>';
+}
+
+function addFromRosterQuick(id) {
+  const p = (rosterCache||[]).find(function(x){ return x.id === id; });
+  if (!p) return;
+  renderQuickNameWarning(null);
+  finishQuickAdd(p.name, p.gender);
+}
+
+function forceQuickAddNew() {
+  const inp = document.getElementById('quick-add-input');
+  const raw = (inp.value||'').trim();
+  if (!raw) return;
+  renderQuickNameWarning(null);
+  finishQuickAdd(raw, 'M');
+}
+
+function finishQuickAdd(name, gender) {
+  if (state.players.some(p => nameKey(p.name) === nameKey(name))) return;   // guards a double-tap
+  state.players.push({ name:name, gender:gender||'M', team:0, skillCategory:null, score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:state.round, wins:0, maxPossible:0 });
+  document.getElementById('quick-add-input').value = '';
   document.getElementById('quick-add-row').style.display = 'none';
   regenerateSchedule();
   renderAbsentToggles();
   renderLeaderboard();
   save();
-  document.getElementById('round-banner-text').textContent = `${known ? known.name : name} added — they'll join the next round.`;
+  document.getElementById('round-banner-text').textContent = `${name} added — they'll join the next round.`;
   document.getElementById('round-banner').style.display = 'flex';
+  syncOnePlayerToRoster(name, gender);
 }
 
 // ── SCORE SUBMISSION ──────────────────────────────────────────────────────────
@@ -3393,15 +3466,50 @@ function cancelSummaryHistoryEdit() {
 
 function addPlayerMidGame() {
   const inp = document.getElementById('new-player-game-input');
-  const name = inp.value.trim();
-  if (!name) return;
-  if (state.players.some(p => nameKey(p.name) === nameKey(name))) { alert('Player already exists'); return; }
-  // Known player: take the roster's saved spelling and gender, not what was typed.
-  const known = (rosterCache||[]).find(p => nameKey(p.name) === nameKey(name));
-  state.players.push({ name: known ? known.name : name, gender: known ? known.gender : 'M', team:0, skillCategory:null, score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
-  inp.value = '';
+  const raw = inp.value.trim();
+  if (!raw) return;
+  if (state.players.some(p => nameKey(p.name) === nameKey(raw))) { alert('Player already exists'); return; }
+  const res = resolvePlayerAdd(raw);
+  if (res.type === 'near') { renderGameNameWarning({ typed: raw, near: res.near }); return; }
+  finishAddPlayerMidGame(res.name, res.gender);
+}
+
+function renderGameNameWarning(info) {
+  const el = document.getElementById('game-name-warning');
+  if (!el) return;
+  if (!info) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="name-warn">A similar name is already in the roster. '
+    + 'Adding a new one creates a separate person, which would split their league record.'
+    + '<div class="name-warn-actions">'
+    + info.near.map(function(p){
+        return '<button class="name-warn-btn" onclick="addFromRosterGame(\'' + p.id + '\')">Use ' + esc(p.name) + '</button>';
+      }).join('')
+    + '<button class="name-warn-btn secondary" onclick="forceAddPlayerMidGame()">Add “' + esc(info.typed) + '” as new</button>'
+    + '</div></div>';
+}
+
+function addFromRosterGame(id) {
+  const p = (rosterCache||[]).find(function(x){ return x.id === id; });
+  if (!p) return;
+  renderGameNameWarning(null);
+  finishAddPlayerMidGame(p.name, p.gender);
+}
+
+function forceAddPlayerMidGame() {
+  const inp = document.getElementById('new-player-game-input');
+  const raw = (inp.value||'').trim();
+  if (!raw) return;
+  renderGameNameWarning(null);
+  finishAddPlayerMidGame(raw, 'M');
+}
+
+function finishAddPlayerMidGame(name, gender) {
+  if (state.players.some(p => nameKey(p.name) === nameKey(name))) return;   // guards a double-tap
+  state.players.push({ name:name, gender:gender||'M', team:0, skillCategory:null, score:0, pointsAgainst:0, matchPts:0, rounds:0, courtsPlayed:0, lastSatOutRound:0, wins:0, maxPossible:0 });
+  document.getElementById('new-player-game-input').value = '';
   regenerateSchedule();
   renderPlayerListGame(); renderAbsentToggles(); renderLeaderboard(); save();
+  syncOnePlayerToRoster(name, gender);
 }
 
 function removePlayerGame(name) {
@@ -3441,7 +3549,7 @@ function switchTab(tab) {
   document.getElementById('players-view').style.display = tab==='players'?'block':'none';
   document.getElementById('sticky-bar').style.display = tab==='courts'?'block':'none';
   if (tab==='standings') { renderLeaderboard(); renderHistory(); }
-  if (tab==='players') renderPlayerListGame();
+  if (tab==='players') { renderPlayerListGame(); renderGameNameWarning(null); }
 }
 
 function finishSession() {
