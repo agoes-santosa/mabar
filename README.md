@@ -414,8 +414,8 @@ player is always spelled the same way. Ten sessions of typed names had drifted i
 
 ## Contributing
 
-This is a personal project but feedback and suggestions are welcome — open an issue or reach out.
+This is a personal project but feedback and suggestions are welcome — open an issue or [message Agoes Santosa on WhatsApp](https://wa.me/6287804373547).
 
 ---
 
-Made by **Agoes Santosa**
+Made by [**Agoes Santosa**](https://wa.me/6287804373547)
