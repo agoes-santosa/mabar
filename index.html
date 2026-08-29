@@ -725,6 +725,7 @@
       <div style="height:.5rem"></div>
     </div>
     <button class="btn btn-primary btn-full" id="pv-takeover-btn" style="display:none;margin-top:.5rem" onclick="openTakeover()">🔑 Take over as referee</button>
+    <button class="btn btn-secondary btn-full" id="pv-fix-btn" style="display:none;margin-top:.5rem" onclick="fixOwnSession()">🔧 Fix this session</button>
     <div style="height:2rem"></div>
   </div>
 </div>
@@ -1043,6 +1044,37 @@ async function claimBaton(code, pin) {
   return { ok: true };
 }
 
+// Reopen a *finished* session for corrections, PIN-free — restricted to the device that
+// ran it (matches the ownership check saveToFirestore's transaction already enforces on
+// every write), since a finished session's PIN is never shown again after it ends and
+// claimBaton's PIN path is reserved for handing control to a genuinely different device.
+async function reclaimOwnSession(code) {
+  const ref = db.collection('sessions').doc(code);
+  const doc = await ref.get();
+  if (!doc.exists) return { ok: false, msg: 'Session not found.' };
+  const d = doc.data();
+  if (d.controllerId !== MY_DEVICE) return { ok: false, msg: 'This isn\'t the device that ran this session.' };
+
+  let s;
+  try { s = JSON.parse(d.payload); } catch(e) { return { ok: false, msg: 'Could not read that session.' }; }
+  s.absentNext = new Set(s.absentNext || []);
+  s.playerRatings = s.playerRatings || {};
+  (s.players || []).forEach(pl => { pl.team = pl.team || 0; pl.skillCategory = pl.skillCategory || null; });
+  s.sessionCode = code;
+  s.refPin = d.refPin;
+  state = s;
+  holdsBaton = true;
+  try { localStorage.setItem('mabar_v2', JSON.stringify(state, (k,v) => v instanceof Set ? [...v] : v)); } catch(e) {}
+  return { ok: true };
+}
+
+async function fixOwnSession() {
+  if (!confirm('Reopen this finished session on this device to fix a mistake — like deleting a misclicked round? It stays finished; you\'re just correcting its record.')) return;
+  const res = await reclaimOwnSession(pvCode);
+  if (!res.ok) { alert(res.msg); return; }
+  location.href = location.href.split('?')[0].replace(/\/index\.html$/, '/');
+}
+
 // ── SHARE MODAL ───────────────────────────────────────────────────────────────
 
 function updateShareUI() {
@@ -1220,6 +1252,13 @@ function initPlayerView(code) {
     // Takeover is offered only while a session is genuinely running and has a PIN.
     const canTakeOver = !data.isFinished && !!data.refPin && data.controllerId !== MY_DEVICE;
     document.getElementById('pv-takeover-btn').style.display = canTakeOver ? 'inline-flex' : 'none';
+
+    // Fixing a mistake (wrong score, misclicked round) in an already-finished session needs
+    // no PIN — it's gated on this being the very device that ran it (same check saveToFirestore's
+    // transaction already trusts for every write), not on remembering a PIN nobody was ever shown
+    // again after the session ended.
+    const canFixOwn = !!data.isFinished && data.controllerId === MY_DEVICE;
+    document.getElementById('pv-fix-btn').style.display = canFixOwn ? 'inline-flex' : 'none';
 
     if (data.isFinished) {
       document.getElementById('pv-content').style.display = 'none';
@@ -3447,7 +3486,10 @@ function renderSummaryHistory() {
                <button class="btn btn-primary btn-sm" style="min-height:32px;padding:4px 12px;font-size:13px" onclick="saveSummaryHistoryEdit(${h.round})">Save</button>
                <button class="btn btn-secondary btn-sm" style="min-height:32px;padding:4px 10px;font-size:13px" onclick="cancelSummaryHistoryEdit()">Cancel</button>
              </div>`
-          : `<button class="btn btn-secondary btn-sm" style="min-height:32px;padding:4px 10px;font-size:12px;color:#5b4fcf" onclick="startSummaryHistoryEdit(${h.round})">Edit</button>`
+          : `<div style="display:flex;gap:6px">
+               <button class="btn btn-secondary btn-sm" style="min-height:32px;padding:4px 10px;font-size:12px;color:#5b4fcf" onclick="startSummaryHistoryEdit(${h.round})">Edit</button>
+               <button class="btn btn-secondary btn-sm" style="min-height:32px;padding:4px 10px;font-size:12px;color:#dc2626" onclick="deleteSummaryHistoryRound(${h.round})">Delete</button>
+             </div>`
         }
       </div>
       ${h.courts.map((c,ci) => isEditing
@@ -3476,6 +3518,22 @@ function saveSummaryHistoryEdit(round) {
 function cancelSummaryHistoryEdit() {
   summaryEditingRound = null;
   renderSummaryHistory();
+}
+
+// Removes a misclicked round entirely (not just its scores) — the round stops counting
+// toward standings, session totals, and every downstream Elo pass that reads this
+// session's history. Other rounds keep their original numbers; no renumbering, since
+// that's just a label and renumbering would make cross-referencing an old screenshot
+// or shared link confusing for no benefit.
+function deleteSummaryHistoryRound(round) {
+  if (!confirm(`Delete Round ${round}? This can't be undone.`)) return;
+  state.history = state.history.filter(h => h.round !== round);
+  if (summaryEditingRound === round) summaryEditingRound = null;
+  recalcAll();
+  cachedCanvas = null;
+  renderSummary();
+  renderSummaryHistory();
+  save();
 }
 
 // ── PLAYER MANAGEMENT ─────────────────────────────────────────────────────────
