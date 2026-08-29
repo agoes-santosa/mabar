@@ -2880,13 +2880,13 @@ function generateRound(advance=true) {
 // ── COURTS RENDERING ─────────────────────────────────────────────────────────
 
 function playerSlotHtml(courtIdx, team, playerIdx, name, alignRight=false) {
-  const inCourt = [...state.courts[courtIdx].team1, ...state.courts[courtIdx].team2];
-  const available = state.sittingOut.filter(n => !inCourt.includes(n));
-  const swapBtn = available.length
-    ? `<button class="swap-btn" onclick="handleSwap(${courtIdx},'${team}',${playerIdx},this)">⇄</button>`
-    : '';
+  // Always rendered, even with nobody sitting out to swap in — an empty slot still
+  // needs its "+ partner" button, and a filled slot still needs the "play singles"
+  // option below, neither of which depends on anyone being available to swap in.
+  const swapBtn = `<button class="swap-btn" onclick="handleSwap(${courtIdx},'${team}',${playerIdx},this)">${name ? '⇄' : '+'}</button>`;
   const isSecond = playerIdx === 1;
-  const nameSpan = `<span class="slot-name${isSecond?' slot-name-muted':''}" style="${alignRight?'text-align:right':'text-align:left'}">${nameHtml(name)}</span>`;
+  const label = name ? nameHtml(name) : '<span style="color:#bbb;font-style:italic;font-weight:500">partner</span>';
+  const nameSpan = `<span class="slot-name${isSecond?' slot-name-muted':''}" style="${alignRight?'text-align:right':'text-align:left'}">${label}</span>`;
   const inner = alignRight ? `${nameSpan}${swapBtn}` : `${swapBtn}${nameSpan}`;
   return `<div class="player-slot" style="${alignRight?'justify-content:flex-end':'justify-content:flex-start'}">${inner}</div>`;
 }
@@ -2899,7 +2899,8 @@ function renderCourts() {
       <div class="vs-row">
         <div class="team">
           ${playerSlotHtml(i,'team1',0,c.team1[0],true)}
-          ${c.team1[1] ? playerSlotHtml(i,'team1',1,c.team1[1],true) : ''}
+          ${c.team1[1] ? playerSlotHtml(i,'team1',1,c.team1[1],true)
+            : (state.gameMode==='doubles' ? playerSlotHtml(i,'team1',1,null,true) : '')}
         </div>
         <div class="score-box">
           <input type="number" min="0" max="99" value="${c.score1}" placeholder="0"
@@ -2910,7 +2911,8 @@ function renderCourts() {
         </div>
         <div class="team">
           ${playerSlotHtml(i,'team2',0,c.team2[0],false)}
-          ${c.team2[1] ? playerSlotHtml(i,'team2',1,c.team2[1],false) : ''}
+          ${c.team2[1] ? playerSlotHtml(i,'team2',1,c.team2[1],false)
+            : (state.gameMode==='doubles' ? playerSlotHtml(i,'team2',1,null,false) : '')}
         </div>
       </div>
     </div>`).join('');
@@ -2938,9 +2940,29 @@ function swapPlayer(courtIdx, team, playerIdx, newName) {
   const oldName = state.courts[courtIdx][team][playerIdx];
   state.courts[courtIdx][team][playerIdx] = newName;
   state.sittingOut = state.sittingOut.filter(n => n !== newName);
-  if (!state.sittingOut.includes(oldName)) state.sittingOut.push(oldName);
-  const p = state.players.find(x=>x.name===oldName);
+  if (oldName && !state.sittingOut.includes(oldName)) state.sittingOut.push(oldName);
+  const p = oldName && state.players.find(x=>x.name===oldName);
   if (p) p.lastSatOutRound = state.round;
+  regenerateSchedule();
+  save();
+  renderCourts();
+}
+
+// Drops one player from a doubles team for just this round — the leftover teammate
+// (or a lone opponent) plays on as a singles/uneven match. Deliberately never touched
+// by the shuffle: this only edits the live state.courts for the round in progress, and
+// regenerateSchedule() only rebuilds the upcoming preview, so every later round is
+// still drawn fresh as full doubles.
+function removeFromCourt(courtIdx, team, playerIdx) {
+  const court = state.courts[courtIdx];
+  const name = court[team][playerIdx];
+  if (!name) return;
+  court[team].splice(playerIdx, 1);
+  if (!state.sittingOut.includes(name)) state.sittingOut.push(name);
+  const p = state.players.find(x=>x.name===name);
+  if (p) p.lastSatOutRound = state.round;
+  _pendingSwap = null;
+  document.getElementById('swap-picker').style.display = 'none';
   regenerateSchedule();
   save();
   renderCourts();
@@ -2948,15 +2970,27 @@ function swapPlayer(courtIdx, team, playerIdx, newName) {
 
 let _pendingSwap = null;
 function handleSwap(courtIdx, team, playerIdx, btn) {
-  const inCourt = [...state.courts[courtIdx].team1, ...state.courts[courtIdx].team2];
+  const court = state.courts[courtIdx];
+  const currentName = court[team][playerIdx];
+  // Only a filled slot on a still-full (2-person) team can drop to singles — an empty
+  // slot has nobody to drop, and a team already down to one player can't go lower.
+  const canRemove = state.gameMode === 'doubles' && !!currentName && court[team].length > 1;
+  const inCourt = [...court.team1, ...court.team2];
   const available = state.sittingOut.filter(n => !inCourt.includes(n));
-  if (!available.length) return;
-  if (available.length === 1) { swapPlayer(courtIdx, team, playerIdx, available[0]); return; }
+
+  if (!canRemove) {
+    if (!available.length) return;
+    if (available.length === 1) { swapPlayer(courtIdx, team, playerIdx, available[0]); return; }
+  }
+
   _pendingSwap = {courtIdx, team, playerIdx};
   const picker = document.getElementById('swap-picker');
-  document.getElementById('swap-picker-opts').innerHTML = available.map(n =>
-    `<button onclick="doSwapFromPicker('${n}')" style="display:block;width:100%;text-align:left;background:none;border:none;padding:9px 12px;font-size:15px;cursor:pointer;border-radius:8px;font-weight:600;color:#1a1a1a">${n}</button>`
-  ).join('');
+  const optBtn = (label, onclick, color) =>
+    `<button onclick="${onclick}" style="display:block;width:100%;text-align:left;background:none;border:none;padding:9px 12px;font-size:15px;cursor:pointer;border-radius:8px;font-weight:600;color:${color||'#1a1a1a'}">${label}</button>`;
+  let html = available.map(n => optBtn(n, `doSwapFromPicker('${n}')`)).join('');
+  if (canRemove) html += optBtn('🚫 No partner', `removeFromCourt(${courtIdx},'${team}',${playerIdx})`, '#dc2626');
+  if (!html) html = `<div style="padding:9px 12px;font-size:13px;color:#bbb">Nobody available</div>`;
+  document.getElementById('swap-picker-opts').innerHTML = html;
   const r = btn.getBoundingClientRect();
   picker.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 170)) + 'px';
   picker.style.top = (r.bottom + 6) + 'px';
