@@ -478,7 +478,10 @@
       <div class="rated-sub" id="rated-sub">Results from this session will affect monthly ratings.</div>
     </div>
     <div class="card">
-      <div class="card-title">Players</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <span class="card-title" style="margin-bottom:0">Players</span>
+        <span id="player-count-badge" style="font-size:12px;font-weight:700;color:#5b4fcf;background:#f0effe;padding:3px 10px;border-radius:20px"></span>
+      </div>
       <div id="player-list-setup"></div>
       <div class="add-row">
         <input type="text" id="new-player-input" placeholder="Search or add a player"
@@ -2435,7 +2438,10 @@ function teamFeasibility(players, courts, mode) {
 
 function renderSetup() {
   const list = document.getElementById('player-list-setup');
-  if (!state.players.length) {
+  const n = state.players.length;
+  const badge = document.getElementById('player-count-badge');
+  if (badge) badge.textContent = n + (n === 1 ? ' player' : ' players');
+  if (!n) {
     list.innerHTML = '<div class="empty-state">No players yet</div>';
     renderTeamWarning();
     renderRosterPicker();
