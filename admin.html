@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Session Admin — Tennis Mabar</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; font-size: 16px; }
+  .app { max-width: 600px; margin: 0 auto; padding: 0 1rem 3rem; }
+  header { display: flex; align-items: center; gap: 10px; padding: 1.25rem 0; }
+  header h1 { font-size: 1.1rem; font-weight: 700; flex: 1; }
+  .badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; background: #fee2e2; color: #991b1b; }
+  .card { background: #fff; border-radius: 14px; border: 0.5px solid #e5e5e0; padding: 1rem 1.1rem; margin-bottom: .875rem; }
+  .card-title { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .75rem; }
+  .btn { border: none; border-radius: 12px; padding: 14px 20px; font-size: 16px; font-weight: 600; cursor: pointer; min-height: 52px; display: inline-flex; align-items: center; justify-content: center; }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background: #5b4fcf; color: #fff; }
+  .btn-secondary { background: #f0f0ec; color: #333; }
+  .btn-danger { background: #fee2e2; color: #991b1b; }
+  .btn-sm { padding: 10px 16px; font-size: 14px; min-height: 44px; }
+  .btn-full { width: 100%; }
+  .btn:disabled { opacity: .5; }
+  input[type="text"], input[type="password"], input[type="number"], input[type="datetime-local"], select { border: 0.5px solid #d0d0cc; border-radius: 10px; padding: 12px 14px; font-size: 16px; width: 100%; outline: none; background: #fff; }
+  input:focus, select:focus { border-color: #7c6ff7; box-shadow: 0 0 0 3px rgba(124,111,247,.12); }
+  input[type="number"] { padding: 8px 6px; text-align: center; font-weight: 700; }
+  label.fld { display: block; font-size: 13px; font-weight: 600; color: #666; margin: 10px 0 4px; }
+  label.fld:first-child { margin-top: 0; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .month-divider { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: .06em; padding: 1rem 0 .5rem; }
+  .session-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: #fff; border: 0.5px solid #e5e5e0; border-radius: 14px; padding: .875rem 1rem; margin-bottom: .625rem; cursor: pointer; }
+  .session-main { flex: 1; min-width: 0; }
+  .session-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .session-sub { font-size: 12px; color: #888; margin-top: 2px; }
+  .tag { display: inline-block; font-size: 10.5px; font-weight: 700; border-radius: 6px; padding: 2px 7px; margin-left: 6px; vertical-align: 1px; }
+  .tag-fin { background: #dcfce7; color: #15803d; }
+  .tag-live { background: #fee2e2; color: #b91c1c; }
+  .tag-casual { background: #f0f0ec; color: #777; }
+  .tag-rated { background: #f0effe; color: #5b4fcf; }
+  .round-block { border: 0.5px solid #e5e5e0; border-radius: 12px; padding: .8rem; margin-bottom: .625rem; background: #fafaf8; }
+  .court-block { background: #fff; border: 0.5px solid #e5e5e0; border-radius: 10px; padding: .6rem; margin-bottom: .5rem; }
+  .court-head { font-size: 12px; font-weight: 700; color: #5b4fcf; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+  .team-grid { display: flex; gap: 6px; align-items: center; }
+  .team-col { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .team-col input { font-size: 14px; padding: 9px 10px; }
+  .score-col { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+  .score-col input { width: 52px; }
+  .vs { font-size: 11px; font-weight: 700; color: #ccc; }
+  .msg { border-radius: 10px; padding: .7rem .8rem; font-size: 13px; line-height: 1.55; margin-bottom: .75rem; display: none; }
+  .msg.err { display: block; background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; }
+  .msg.ok { display: block; background: #dcfce7; border: 1px solid #86efac; color: #15803d; }
+  .note { font-size: 12.5px; color: #888; line-height: 1.6; background: #fafaf8; border: 0.5px solid #eee; border-radius: 10px; padding: .7rem .8rem; margin-bottom: .875rem; }
+  .preview-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .preview-table td, .preview-table th { padding: 6px 4px; border-bottom: 0.5px solid #f0f0ec; text-align: left; }
+  .preview-table th { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: .04em; }
+  .preview-table td.num, .preview-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  #pin-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+  .pin-box { background: #fff; border-radius: 16px; padding: 1.5rem 1.35rem; max-width: 330px; width: 100%; }
+  .check-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; font-size: 15px; font-weight: 600; cursor: pointer; user-select: none; }
+  .check-row input { width: 20px; height: 20px; accent-color: #5b4fcf; }
+  .danger-zone { border: 1px solid #fca5a5; }
+  .player-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 0.5px solid #f0f0ec; }
+  .player-row:last-child { border-bottom: none; }
+  .player-row .nm { flex: 1; font-size: 15px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mini-btn { border: none; border-radius: 8px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; background: #f0f0ec; color: #444; min-height: 36px; }
+  .mini-btn.danger { background: #fee2e2; color: #991b1b; }
+  .mini-btn.primary { background: #f0effe; color: #5b4fcf; }
+  .footer { text-align: center; font-size: 12px; color: #bbb; margin-top: 1.25rem; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🔧 Session Admin</h1>
+    <span class="badge">Finished sessions</span>
+  </header>
+
+  <div id="pin-overlay" style="display:none">
+    <div class="pin-box">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px">Enter admin PIN</div>
+      <div style="font-size:13px;color:#888;line-height:1.55;margin-bottom:1rem">This tool can rewrite scores and delete sessions. The PIN keeps a borrowed phone from opening it by accident.</div>
+      <input type="password" inputmode="numeric" maxlength="20" id="pin-input" placeholder="PIN" style="text-align:center;letter-spacing:.2em;font-size:20px" onkeydown="if(event.key==='Enter')submitPin()" />
+      <div id="pin-error" style="display:none;color:#dc2626;font-size:13px;margin-top:.5rem"></div>
+      <button class="btn btn-primary btn-full" style="margin-top:.875rem" id="pin-btn" onclick="submitPin()">Unlock</button>
+    </div>
+  </div>
+
+  <!-- LIST -->
+  <div id="view-list">
+    <div class="note">Lists every session in Firestore, newest month first. Tap one to fix its scores, players, settings — or delete it. Ratings reflow automatically after you save, since they are recomputed from history on every read. Nothing here touches <code>index.html</code>.</div>
+    <div id="list-msg" class="msg"></div>
+    <div style="display:flex;gap:8px;margin-bottom:.875rem">
+      <button class="btn btn-secondary btn-sm" style="flex:1" onclick="loadList()">↻ Refresh list</button>
+    </div>
+    <div id="session-list"><div style="text-align:center;padding:2rem;color:#bbb">Loading…</div></div>
+  </div>
+
+  <!-- EDIT -->
+  <div id="view-edit" style="display:none">
+    <button class="mini-btn" onclick="backToList()">‹ All sessions</button>
+    <div style="height:.625rem"></div>
+    <div id="edit-msg" class="msg"></div>
+
+    <div class="card">
+      <div class="card-title">Session <span id="edit-code" style="color:#5b4fcf"></span></div>
+      <label class="fld" for="f-name">Session name</label>
+      <input type="text" id="f-name" />
+      <div class="row" style="margin-top:10px">
+        <div style="flex:1">
+          <label class="fld" for="f-mode">Mode</label>
+          <select id="f-mode">
+            <option value="doubles">Doubles (2v2)</option>
+            <option value="singles">Singles (1v1)</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label class="fld" for="f-courts">Courts</label>
+          <input type="number" id="f-courts" min="1" max="6" step="1" />
+        </div>
+      </div>
+      <label class="fld" for="f-date">Session date</label>
+      <div class="row">
+        <input type="datetime-local" id="f-date" style="flex:1" />
+        <button class="mini-btn" onclick="setDateNow()" title="Set to right now">Now</button>
+      </div>
+      <div style="font-size:12px;color:#999;line-height:1.5;margin-top:4px">Month grouping + ratings month come from this. Saving keeps whatever is shown — it no longer bumps to today.</div>
+      <label class="check-row" style="margin-top:6px"><input type="checkbox" id="f-rated" /> Rated (counts toward ratings)</label>
+      <label class="check-row"><input type="checkbox" id="f-finished" /> Finished (uncheck to reopen for play)</label>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Players (roster for this session only)</div>
+      <div class="note" style="margin-bottom:.625rem">Rename here rewrites the name in this session's rounds too. It does <b>not</b> touch the club roster or other sessions — fix cross-session spelling in the main app's Manage roster.</div>
+      <div id="edit-players"></div>
+      <div class="row" style="margin-top:8px">
+        <input type="text" id="new-player-name" placeholder="Add player name" onkeydown="if(event.key==='Enter')addPlayerToSession()" />
+        <button class="mini-btn primary" onclick="addPlayerToSession()">Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <span class="card-title" style="margin-bottom:0">Rounds</span>
+        <button class="mini-btn primary" onclick="addRound()">＋ Add round</button>
+      </div>
+      <div id="edit-rounds"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+        <span class="card-title" style="margin-bottom:0">Preview (recomputed)</span>
+        <button class="mini-btn" onclick="refreshPreview()">Recalculate</button>
+      </div>
+      <div id="edit-preview"></div>
+    </div>
+
+    <button class="btn btn-primary btn-full" id="save-btn" onclick="saveSession(event)">Save changes</button>
+    <div style="height:.5rem"></div>
+    <button class="btn btn-secondary btn-full btn-sm" onclick="downloadBackup()">Download JSON backup</button>
+    <div style="height:.875rem"></div>
+
+    <div class="card danger-zone">
+      <div class="card-title" style="color:#991b1b">Danger zone</div>
+      <div style="font-size:13px;color:#666;line-height:1.6;margin-bottom:.625rem">Deleting removes the session document from Firestore entirely — scores, history, and its effect on ratings. This can't be undone. Download a backup first if unsure.</div>
+      <button class="btn btn-danger btn-full btn-sm" onclick="deleteSession()">Delete this session</button>
+    </div>
+    <div style="height:.5rem"></div>
+  </div>
+
+  <div class="footer">Tennis Mabar App — admin tool by Agoes Santosa</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+// Change this to whatever PIN you want. It is a guard against an accidental tap,
+// not real security — same honest trade-off as the referee PIN in index.html.
+const ADMIN_PIN = '1234';
+
+// Same Firebase project as index.html (mabar-tennis). No need to fill anything
+// else in — sessions live under `sessions/{code}` with the whole game state as
+// a JSON string in `payload`, plus top-level sessionName / round / isFinished /
+// isRated / updatedAt. Ratings are derived from history on read, so editing the
+// payload here automatically reflows every downstream rating.
+firebase.initializeApp({
+  apiKey: "AIzaSyCE6QbASYqnzLqITmE2K1hPTKOH3VLdA9I",
+  authDomain: "mabar-tennis.firebaseapp.com",
+  projectId: "mabar-tennis",
+  storageBucket: "mabar-tennis.firebasestorage.app",
+  messagingSenderId: "851060893421",
+  appId: "1:851060893421:web:d25694c8f98657169f8ee4"
+});
+const db = firebase.firestore();
+
+// ── PIN GATE ──────────────────────────────────────────────────────────────────
+if (sessionStorage.getItem('session_admin_ok') !== '1') {
+  document.getElementById('pin-overlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('pin-input').focus(), 100);
+}
+function submitPin() {
+  const v = document.getElementById('pin-input').value;
+  if (v === ADMIN_PIN) {
+    sessionStorage.setItem('session_admin_ok', '1');
+    document.getElementById('pin-overlay').style.display = 'none';
+    loadList();
+  } else {
+    const e = document.getElementById('pin-error');
+    e.textContent = 'Wrong PIN.';
+    e.style.display = 'block';
+  }
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function setMsg(where, text, kind) {
+  const el = document.getElementById(where);
+  el.className = 'msg' + (kind ? ' ' + kind : '');
+  el.textContent = text || '';
+  if (text) el.style.display = 'block'; else el.style.display = 'none';
+}
+function fmtDate(d) {
+  if (!d) return '';
+  return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+}
+function monthLabel(d) {
+  if (!d) return 'Undated';
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+// datetime-local needs a local 'YYYY-MM-DDTHH:MM' string — toISOString would shift to UTC.
+function toLocalInput(d) {
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function setDateNow() { document.getElementById('f-date').value = toLocalInput(new Date()); }
+// Saving keeps the shown date. Only falls back to the server clock when there is
+// no usable date at all (e.g. a legacy session with no timestamp).
+function chosenTimestamp() {
+  const v = document.getElementById('f-date').value;
+  const d = v ? new Date(v) : null;
+  if (d && !isNaN(d.getTime())) return firebase.firestore.Timestamp.fromDate(d);
+  if (editWhen) return firebase.firestore.Timestamp.fromDate(editWhen);
+  return firebase.firestore.FieldValue.serverTimestamp();
+}
+
+// Match Pts weights — must match index.html or the preview lies.
+const MATCH_PTS_WIN = 2, MATCH_PTS_LOSE = 1, MATCH_PTS_TIE = 1.5;
+
+// Local recompute of player totals from history — same arithmetic as
+// recalcAll() in index.html, but operating on the passed object so the
+// preview matches what the main app will show after saving.
+function recompute(S) {
+  (S.players || []).forEach(p => {
+    p.score = 0; p.rounds = 0; p.courtsPlayed = 0; p.wins = 0;
+    p.maxPossible = 0; p.pointsAgainst = 0; p.matchPts = 0;
+  });
+  S.partnerHistory = {};
+  S.opponentHistory = {};
+  const pairKey = (a, b) => [a, b].sort().join('|');
+  [...(S.history || [])].reverse().forEach(h => {
+    (h.courts || []).forEach(c => {
+      const s1 = +c.score1 || 0, s2 = +c.score2 || 0;
+      const t1won = s1 > s2, t2won = s2 > s1, tie = s1 === s2;
+      const mx = Math.max(s1, s2);
+      const mp1 = t1won ? MATCH_PTS_WIN : tie ? MATCH_PTS_TIE : MATCH_PTS_LOSE;
+      const mp2 = t2won ? MATCH_PTS_WIN : tie ? MATCH_PTS_TIE : MATCH_PTS_LOSE;
+      (c.team1 || []).forEach(n => {
+        const p = (S.players || []).find(x => x.name === n);
+        if (p) { p.score += s1; p.pointsAgainst += s2; p.rounds++; p.courtsPlayed++; p.maxPossible += mx; p.matchPts += mp1; if (t1won) p.wins++; }
+      });
+      (c.team2 || []).forEach(n => {
+        const p = (S.players || []).find(x => x.name === n);
+        if (p) { p.score += s2; p.pointsAgainst += s1; p.rounds++; p.courtsPlayed++; p.maxPossible += mx; p.matchPts += mp2; if (t2won) p.wins++; }
+      });
+      if ((c.team1 || []).length === 2) {
+        const k = pairKey(c.team1[0], c.team1[1]);
+        S.partnerHistory[k] = (S.partnerHistory[k] || 0) + 1;
+      }
+      if ((c.team2 || []).length === 2) {
+        const k = pairKey(c.team2[0], c.team2[1]);
+        S.partnerHistory[k] = (S.partnerHistory[k] || 0) + 1;
+      }
+      (c.team1 || []).forEach(a => (c.team2 || []).forEach(b => {
+        const k = pairKey(a, b);
+        S.opponentHistory[k] = (S.opponentHistory[k] || 0) + 1;
+      }));
+    });
+    (h.sittingOut || []).forEach(n => {
+      const p = (S.players || []).find(x => x.name === n);
+      if (p) p.rounds++;
+    });
+  });
+}
+
+// ── LIST ──────────────────────────────────────────────────────────────────────
+async function loadList() {
+  const box = document.getElementById('session-list');
+  setMsg('list-msg', '');
+  box.innerHTML = '<div style="text-align:center;padding:2rem;color:#bbb">Loading…</div>';
+  try {
+    const snap = await db.collection('sessions').orderBy('updatedAt', 'desc').limit(100).get();
+    const items = snap.docs.map(d => {
+      const x = d.data();
+      let players = 0, rounds = 0, mode = '';
+      try {
+        const s = JSON.parse(x.payload || '{}');
+        players = (s.players || []).length;
+        rounds = (s.history || []).length;
+        mode = s.gameMode || '';
+      } catch (e) {}
+      return {
+        code: d.id,
+        name: x.sessionName || 'Untitled session',
+        round: x.round || 0,
+        finished: !!x.isFinished,
+        rated: (x.isRated !== undefined ? x.isRated : true) !== false,
+        players, rounds, mode,
+        when: x.updatedAt && x.updatedAt.toDate ? x.updatedAt.toDate() : null
+      };
+    });
+    if (!items.length) { box.innerHTML = '<div style="text-align:center;padding:2rem;color:#bbb">No sessions yet.</div>'; return; }
+    let lastMonth = null, html = '';
+    items.forEach(s => {
+      const m = monthLabel(s.when);
+      if (m !== lastMonth) { html += `<div class="month-divider">${esc(m)}</div>`; lastMonth = m; }
+      html += `<button class="session-row" onclick="openSession('${esc(s.code)}')">
+        <div class="session-main">
+          <div class="session-name">${esc(s.name)}<span class="tag ${s.finished ? 'tag-fin' : 'tag-live'}">${s.finished ? 'finished' : 'live'}</span><span class="tag ${s.rated ? 'tag-rated' : 'tag-casual'}">${s.rated ? 'rated' : 'casual'}</span></div>
+          <div class="session-sub">${esc(fmtDate(s.when))} · ${s.rounds} rounds · ${s.players} players${s.mode === 'singles' ? ' · singles' : ''} · ${esc(s.code)}</div>
+        </div>
+        <span style="color:#ccc;font-size:18px">›</span>
+      </button>`;
+    });
+    box.innerHTML = html;
+  } catch (e) {
+    console.warn(e);
+    box.innerHTML = '';
+    setMsg('list-msg', 'Could not load sessions — check your connection / Firestore rules. (' + (e && e.message ? e.message : e) + ')', 'err');
+  }
+}
+
+// ── EDIT STATE ────────────────────────────────────────────────────────────────
+let editCode = null;
+let editWhen = null; // original Firestore updatedAt — the session's real date
+let S = null; // working copy of the session payload
+
+function slotsPerSide() { return (S && S.gameMode === 'singles') ? 1 : 2; }
+
+async function openSession(code) {
+  setMsg('list-msg', '');
+  try {
+    const doc = await db.collection('sessions').doc(code).get();
+    if (!doc.exists) { setMsg('list-msg', 'Session not found — it may have been deleted.', 'err'); return; }
+    const data = doc.data();
+    try { S = JSON.parse(data.payload || '{}'); }
+    catch (e) { setMsg('list-msg', 'Could not parse that session payload.', 'err'); return; }
+    editCode = code;
+    editWhen = (data.updatedAt && data.updatedAt.toDate) ? data.updatedAt.toDate() : null;
+    // Backfill fields the same way index.html's load() does, so old sessions edit cleanly.
+    S.players = S.players || [];
+    S.history = S.history || [];
+    Splayers_norm();
+    if (S.isRated === undefined) S.isRated = (data.isRated !== undefined ? data.isRated : true) !== false;
+    if (S.isFinished === undefined) S.isFinished = !!data.isFinished;
+    if (!S.gameMode) S.gameMode = 'doubles';
+    if (!S.maxCourts) S.maxCourts = 1;
+    if (!Array.isArray(S.schedule)) S.schedule = [];
+    if (!S.partnerHistory) S.partnerHistory = {};
+    if (!S.opponentHistory) S.opponentHistory = {};
+    document.getElementById('view-list').style.display = 'none';
+    document.getElementById('view-edit').style.display = 'block';
+    document.getElementById('edit-code').textContent = code;
+    document.getElementById('f-name').value = S.sessionName || data.sessionName || '';
+    document.getElementById('f-mode').value = S.gameMode === 'singles' ? 'singles' : 'doubles';
+    document.getElementById('f-courts').value = S.maxCourts || 1;
+    document.getElementById('f-date').value = editWhen ? toLocalInput(editWhen) : '';
+    document.getElementById('f-rated').checked = S.isRated !== false;
+    document.getElementById('f-finished').checked = S.isFinished !== false;
+    setMsg('edit-msg', '');
+    renderPlayers();
+    renderRounds();
+    refreshPreview();
+    window.scrollTo({ top: 0 });
+  } catch (e) {
+    console.warn(e);
+    setMsg('list-msg', 'Could not open session: ' + (e && e.message ? e.message : e), 'err');
+  }
+}
+
+function Splayers_norm() {
+  S.players.forEach(p => {
+    if (typeof p === 'string') return; // guarded below
+    p.gender = p.gender || 'M';
+    p.team = p.team || 0;
+    if (p.skillCategory === undefined) p.skillCategory = null;
+    ['score', 'pointsAgainst', 'matchPts', 'rounds', 'courtsPlayed', 'wins', 'maxPossible', 'lastSatOutRound'].forEach(k => {
+      if (p[k] == null || isNaN(+p[k])) p[k] = 0;
+    });
+  });
+  // Very old saves occasionally stored bare strings — promote them.
+  S.players = S.players.map(p => typeof p === 'string'
+    ? { name: p, gender: 'M', team: 0, skillCategory: null, score: 0, pointsAgainst: 0, matchPts: 0, rounds: 0, courtsPlayed: 0, lastSatOutRound: 0, wins: 0, maxPossible: 0 }
+    : p);
+}
+
+function backToList() {
+  editCode = null; editWhen = null; S = null;
+  document.getElementById('view-edit').style.display = 'none';
+  document.getElementById('view-list').style.display = 'block';
+  loadList();
+}
+
+// ── PLAYERS ───────────────────────────────────────────────────────────────────
+function renderPlayers() {
+  const box = document.getElementById('edit-players');
+  if (!S.players.length) { box.innerHTML = '<div style="font-size:13px;color:#bbb">No players in roster.</div>'; return; }
+  box.innerHTML = S.players.map((p, i) => `
+    <div class="player-row">
+      <span class="nm">${esc(p.name)}</span>
+      <button class="mini-btn primary" onclick="renamePlayer(${i})">Rename</button>
+      <button class="mini-btn danger" onclick="removePlayer(${i})">Remove</button>
+    </div>`).join('');
+}
+
+function rewriteName(oldName, newName) {
+  S.players.forEach(p => { if (p.name === oldName) p.name = newName; });
+  (S.history || []).forEach(h => {
+    (h.courts || []).forEach(c => {
+      c.team1 = (c.team1 || []).map(n => n === oldName ? newName : n);
+      c.team2 = (c.team2 || []).map(n => n === oldName ? newName : n);
+    });
+    h.sittingOut = (h.sittingOut || []).map(n => n === oldName ? newName : n);
+  });
+  (S.courts || []).forEach(c => {
+    c.team1 = (c.team1 || []).map(n => n === oldName ? newName : n);
+    c.team2 = (c.team2 || []).map(n => n === oldName ? newName : n);
+  });
+  S.sittingOut = (S.sittingOut || []).map(n => n === oldName ? newName : n);
+}
+
+function renamePlayer(i) {
+  const old = S.players[i].name;
+  const next = prompt(`Rename "${old}" to:`, old);
+  if (next == null) return;
+  const name = next.trim();
+  if (!name || name === old) return;
+  if (S.players.some((p, j) => j !== i && p.name.toLowerCase() === name.toLowerCase())) {
+    alert('That name is already in this session.');
+    return;
+  }
+  rewriteName(old, name);
+  renderPlayers(); renderRounds(); refreshPreview();
+}
+
+function removePlayer(i) {
+  const p = S.players[i];
+  const used = (S.history || []).some(h =>
+    (h.courts || []).some(c => (c.team1 || []).concat(c.team2 || []).includes(p.name)) ||
+    (h.sittingOut || []).includes(p.name));
+  if (used && !confirm(`"${p.name}" appears in round history. Removing them from the roster keeps the name string in those rounds but drops them from standings. Continue?`)) return;
+  if (!used && !confirm(`Remove "${p.name}" from this session?`)) return;
+  S.players.splice(i, 1);
+  renderPlayers(); renderRounds(); refreshPreview();
+}
+
+function addPlayerToSession() {
+  const inp = document.getElementById('new-player-name');
+  const name = inp.value.trim();
+  if (!name) return;
+  if (S.players.some(p => p.name.toLowerCase() === name.toLowerCase())) { alert('Player already in this session.'); return; }
+  S.players.push({ name, gender: 'M', team: 0, skillCategory: null, score: 0, pointsAgainst: 0, matchPts: 0, rounds: 0, courtsPlayed: 0, lastSatOutRound: 0, wins: 0, maxPossible: 0 });
+  inp.value = '';
+  renderPlayers(); refreshPreview();
+}
+
+// ── ROUNDS ────────────────────────────────────────────────────────────────────
+function sortedHistory() {
+  return [...(S.history || [])].sort((a, b) => a.round - b.round);
+}
+
+function renderRounds() {
+  const box = document.getElementById('edit-rounds');
+  const hist = sortedHistory();
+  if (!hist.length) { box.innerHTML = '<div style="font-size:13px;color:#bbb">No rounds yet.</div>'; return; }
+  const n = slotsPerSide();
+  box.innerHTML = hist.map(h => `
+    <div class="round-block" data-round="${h.round}">
+      <div class="row" style="margin-bottom:8px">
+        <span style="font-size:13px;font-weight:800;color:#5b4fcf">Round ${h.round}</span>
+        <span style="flex:1"></span>
+        <button class="mini-btn danger" onclick="deleteRound(${h.round})">Delete round</button>
+      </div>
+      ${(h.courts || []).map((c, ci) => `
+        <div class="court-block">
+          <div class="court-head"><span>Court ${ci + 1}</span><button class="mini-btn" onclick="deleteCourt(${h.round},${ci})">Remove court</button></div>
+          <div class="team-grid">
+            <div class="team-col">
+              ${Array.from({ length: n }, (_, k) => `<input type="text" data-r="${h.round}" data-c="${ci}" data-t="1" data-k="${k}" value="${esc((c.team1 || [])[k] || '')}" placeholder="Player ${k + 1}" />`).join('')}
+            </div>
+            <div class="score-col">
+              <input type="number" data-r="${h.round}" data-c="${ci}" data-s="1" value="${c.score1 == null ? 0 : c.score1}" inputmode="numeric" />
+              <span class="vs">–</span>
+              <input type="number" data-r="${h.round}" data-c="${ci}" data-s="2" value="${c.score2 == null ? 0 : c.score2}" inputmode="numeric" />
+            </div>
+            <div class="team-col">
+              ${Array.from({ length: n }, (_, k) => `<input type="text" data-r="${h.round}" data-c="${ci}" data-t="2" data-k="${k}" value="${esc((c.team2 || [])[k] || '')}" placeholder="Player ${k + 1}" />`).join('')}
+            </div>
+          </div>
+        </div>`).join('')}
+      <button class="mini-btn" onclick="addCourt(${h.round})">+ Court</button>
+      <label class="fld" style="margin-top:8px">Sitting out (comma-separated)</label>
+      <input type="text" data-sitting="${h.round}" value="${esc((h.sittingOut || []).join(', '))}" />
+    </div>`).join('');
+}
+
+function readRoundsFromDom() {
+  const hist = sortedHistory();
+  const byRound = {};
+  hist.forEach(h => { byRound[h.round] = h; });
+  // scores + teams
+  document.querySelectorAll('#edit-rounds input[data-r]').forEach(el => {
+    const r = +el.dataset.r, ci = +el.dataset.c;
+    const h = byRound[r];
+    if (!h || !h.courts[ci]) return;
+    if (el.dataset.s) {
+      h.courts[ci]['score' + el.dataset.s] = parseInt(el.value) || 0;
+    } else {
+      const key = el.dataset.t === '1' ? 'team1' : 'team2';
+      const k = +el.dataset.k;
+      h.courts[ci][key] = h.courts[ci][key] || [];
+      h.courts[ci][key][k] = el.value.trim();
+    }
+  });
+  // sitting out
+  document.querySelectorAll('#edit-rounds input[data-sitting]').forEach(el => {
+    const r = +el.dataset.sitting;
+    const h = byRound[r];
+    if (h) h.sittingOut = el.value.split(',').map(s => s.trim()).filter(Boolean);
+  });
+  // drop empty name slots, keep order (no length cap — switching modes must not silently drop names)
+  Object.values(byRound).forEach(h => {
+    h.courts.forEach(c => {
+      c.team1 = (c.team1 || []).map(s => (s || '').trim()).filter(Boolean);
+      c.team2 = (c.team2 || []).map(s => (s || '').trim()).filter(Boolean);
+    });
+  });
+  return Object.values(byRound);
+}
+
+function deleteRound(round) {
+  if (!confirm(`Delete Round ${round}? This can't be undone.`)) return;
+  readRoundsFromDom();
+  S.history = (S.history || []).filter(h => h.round !== round);
+  renderRounds(); refreshPreview();
+}
+
+function addRound() {
+  readRoundsFromDom();
+  const max = (S.history || []).reduce((m, h) => Math.max(m, h.round || 0), 0);
+  const n = slotsPerSide();
+  const blank = { team1: Array(n).fill(''), team2: Array(n).fill(''), score1: 0, score2: 0 };
+  S.history.push({ round: max + 1, courts: [JSON.parse(JSON.stringify(blank))], sittingOut: [] });
+  renderRounds();
+  setTimeout(() => {
+    const el = document.querySelector(`.round-block[data-round="${max + 1}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 50);
+}
+
+function addCourt(round) {
+  readRoundsFromDom();
+  const h = (S.history || []).find(x => x.round === round);
+  if (!h) return;
+  const n = slotsPerSide();
+  h.courts.push({ team1: Array(n).fill(''), team2: Array(n).fill(''), score1: 0, score2: 0 });
+  renderRounds();
+}
+
+function deleteCourt(round, ci) {
+  if (!confirm('Remove this court from the round?')) return;
+  readRoundsFromDom();
+  const h = (S.history || []).find(x => x.round === round);
+  if (!h) return;
+  h.courts.splice(ci, 1);
+  if (!h.courts.length) {
+    if (confirm('That was the last court — delete the whole round instead?')) {
+      S.history = S.history.filter(x => x.round !== round);
+    } else {
+      const n = slotsPerSide();
+      h.courts.push({ team1: Array(n).fill(''), team2: Array(n).fill(''), score1: 0, score2: 0 });
+    }
+  }
+  renderRounds(); refreshPreview();
+}
+
+// ── PREVIEW ───────────────────────────────────────────────────────────────────
+function collectEdits() {
+  S.sessionName = document.getElementById('f-name').value.trim();
+  S.gameMode = document.getElementById('f-mode').value === 'singles' ? 'singles' : 'doubles';
+  S.maxCourts = Math.max(1, Math.min(6, parseInt(document.getElementById('f-courts').value) || 1));
+  S.isRated = document.getElementById('f-rated').checked;
+  S.isFinished = document.getElementById('f-finished').checked;
+  S.history = readRoundsFromDom();
+  // Auto-add roster entries for names typed into courts but missing from players,
+  // so the preview (and save) credits them instead of silently dropping them.
+  const known = new Set(S.players.map(p => p.name));
+  S.history.forEach(h => {
+    (h.courts || []).forEach(c => {
+      (c.team1 || []).concat(c.team2 || []).forEach(nm => {
+        if (nm && !known.has(nm)) {
+          known.add(nm);
+          S.players.push({ name: nm, gender: 'M', team: 0, skillCategory: null, score: 0, pointsAgainst: 0, matchPts: 0, rounds: 0, courtsPlayed: 0, lastSatOutRound: 0, wins: 0, maxPossible: 0 });
+        }
+      });
+    });
+  });
+}
+
+function validateRounds(rounds) {
+  for (const h of rounds) {
+    const picked = [];
+    for (const c of (h.courts || [])) {
+      picked.push(...(c.team1 || []), ...(c.team2 || []));
+    }
+    const clean = picked.filter(Boolean);
+    if (new Set(clean).size !== clean.length)
+      return `Round ${h.round}: the same player appears more than once.`;
+    if (!clean.length)
+      return `Round ${h.round}: no players entered.`;
+  }
+  return null;
+}
+
+function refreshPreview() {
+  try {
+    collectEdits();
+    recompute(S);
+    renderPlayers();
+    const rows = [...S.players].sort((a, b) => (b.score - a.score) || ((b.score - b.pointsAgainst) - (a.score - a.pointsAgainst)));
+    document.getElementById('edit-preview').innerHTML = `
+      <table class="preview-table">
+        <tr><th>Player</th><th class="num">Played</th><th class="num">W</th><th class="num">Pts</th><th class="num">Match</th></tr>
+        ${rows.map(p => `<tr><td>${esc(p.name)}</td><td class="num">${p.courtsPlayed || 0}</td><td class="num">${p.wins || 0}</td><td class="num">${p.score || 0}</td><td class="num">${p.matchPts || 0}</td></tr>`).join('') || '<tr><td colspan="5" style="color:#bbb">No players</td></tr>'}
+      </table>`;
+  } catch (e) { console.warn(e); }
+}
+
+// ── SAVE / DELETE ─────────────────────────────────────────────────────────────
+function cleanPayload() {
+  const c = JSON.parse(JSON.stringify(S, (k, v) => {
+    if (k === 'bgPhoto') return null;
+    if (v instanceof Set) return [...v];
+    return v;
+  }));
+  if (!Array.isArray(c.absentNext)) c.absentNext = [];
+  return c;
+}
+
+async function saveSession(e) {
+  const btn = e ? e.target : document.getElementById('save-btn');
+  setMsg('edit-msg', '');
+  try {
+    collectEdits();
+    const err = validateRounds(S.history);
+    if (err) { setMsg('edit-msg', err, 'err'); return; }
+    if (!S.players.length) { setMsg('edit-msg', 'No players in this session.', 'err'); return; }
+    btn.textContent = 'Saving…'; btn.disabled = true;
+    recompute(S);
+    renderPlayers();
+    const maxHist = (S.history || []).reduce((m, h) => Math.max(m, h.round || 0), 0);
+    S.round = Math.max(S.round || 0, maxHist);
+    const payload = cleanPayload();
+    // update() — not set() — so controllerId / refPin / autoEnded survive the edit.
+    await db.collection('sessions').doc(editCode).update({
+      updatedAt: chosenTimestamp(),
+      sessionName: S.sessionName || '',
+      round: S.round || 0,
+      isFinished: S.isFinished !== false,
+      isRated: S.isRated !== false,
+      payload: JSON.stringify(payload)
+    });
+    setMsg('edit-msg', 'Saved. Ratings reflow automatically — check the session in the main app.', 'ok');
+  } catch (e2) {
+    console.warn(e2);
+    setMsg('edit-msg', 'Save failed: ' + (e2 && e2.message ? e2.message : e2), 'err');
+  } finally {
+    btn.textContent = 'Save changes'; btn.disabled = false;
+  }
+}
+
+function downloadBackup() {
+  try {
+    collectEdits();
+    const blob = new Blob([JSON.stringify(cleanPayload(), null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'session-' + editCode + '-backup.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  } catch (e) { setMsg('edit-msg', 'Backup failed: ' + e.message, 'err'); }
+}
+
+async function deleteSession() {
+  const typed = prompt(`Type the session code (${editCode}) to permanently delete this session:`);
+  if (typed == null) return;
+  if (typed.trim() !== editCode) { alert('Code did not match — nothing deleted.'); return; }
+  if (!confirm('Last chance: delete this session from Firestore? This cannot be undone.')) return;
+  setMsg('edit-msg', '');
+  try {
+    await db.collection('sessions').doc(editCode).delete();
+    alert('Session deleted.');
+    backToList();
+  } catch (e) {
+    setMsg('edit-msg', 'Delete failed: ' + (e && e.message ? e.message : e), 'err');
+  }
+}
+
+// React to mode switch changing slots per side.
+document.getElementById('f-mode').addEventListener('change', () => { readRoundsFromDom(); renderRounds(); refreshPreview(); });
+
+loadList();
+</script>
+</body>
+</html>
