@@ -815,7 +815,7 @@
     <div style="padding:1.1rem;font-size:13.5px;color:#555;line-height:1.65">
       <p style="margin-bottom:.75rem">Ratings use <b>Elo</b> — the same system chess uses, starting everyone at 1000. Before each match, both sides' ratings predict who <i>should</i> win — beat a stronger opponent and you gain more, lose to a weaker one and you lose more. Every point gained is lost by someone else, so the rating pool never inflates.</p>
       <p style="margin-bottom:.75rem"><b>This month</b> restarts everyone at 1000 on the 1st, so a rough month never follows you around — above 1000 means you've gained ground since the reset. <b>All time</b> never resets; it's the long-run number across every rated session.</p>
-      <p style="margin:0">Both need <b><span id="rating-explain-min"></span>+ matches</b> in their window (that month, or ever) before they're ranked — fewer than that and you're marked <b>provisional</b>, still shown, just not ranked yet, so a lucky short streak can't top the table.</p>
+      <p style="margin:0">Both need <b><span id="rating-explain-min"></span>+ matches across 2+ sessions</b> in their window (that month, or ever) before they're ranked — fewer than that and you're marked <b>provisional</b>, still shown, just not ranked yet, so one big session alone can't top the table.</p>
     </div>
   </div>
 </div>
@@ -4509,6 +4509,14 @@ function standingsModeToggle() {
     + '</div>';
 }
 
+// Ranked-table bar: RATED_MIN_MATCHES+ matches AND 2+ sessions in the scope.
+// A big single session (10+ matches in one day) stays provisional until a
+// second session — one day's form shouldn't rank. Used by the leaderboard
+// split, the rank chips, and the provisional badge so the three never disagree.
+function qualifiedForRank(matches, sessions) {
+  return matches >= RATED_MIN_MATCHES && sessions >= 2;
+}
+
 function renderStandings() {
   const el = document.getElementById('standings-body');
   if (!standingsData || !standingsMonths.length) return;
@@ -4529,6 +4537,7 @@ function renderStandings() {
       alt: monthly ? (at.rating[n] === undefined ? null : at.rating[n]) : null,
       last: st.last,
       allTimeMatches: (at.stats[n] || {matches:0}).matches,
+      allTimeSessions: Object.keys((at.stats[n] || {sess:{}}).sess).length,
       matches: st.matches,
       sessions: Object.keys(st.sess).length,
       winPct: st.matches ? Math.round(st.wins / st.matches * 100) : 0,
@@ -4537,8 +4546,8 @@ function renderStandings() {
   }).filter(function(r){ return standingsGender === 'all' || r.gender === standingsGender; });
 
   const byRating = function(a,b){ return b.rating - a.rating || a.name.localeCompare(b.name); };
-  const ranked   = rows.filter(function(r){ return r.matches >= RATED_MIN_MATCHES; }).sort(byRating);
-  const unranked = rows.filter(function(r){ return r.matches <  RATED_MIN_MATCHES; }).sort(byRating);
+  const ranked   = rows.filter(function(r){ return qualifiedForRank(r.matches, r.sessions); }).sort(byRating);
+  const unranked = rows.filter(function(r){ return !qualifiedForRank(r.matches, r.sessions); }).sort(byRating);
 
   const row = function(r, i, showRank) {
     // A monthly rating starts from 1000, so the number IS the change — no arrow needed.
@@ -4552,7 +4561,7 @@ function renderStandings() {
       + '<div class="ms-main">'
       +   '<div class="ms-name">' + esc(r.name)
       +     (r.gender === 'F' ? ' <span class="fem-mark">' + genderIconSvg('F') + '</span>' : '')
-      +     (r.allTimeMatches < RATED_MIN_MATCHES ? '<span class="ms-prov">provisional</span>' : '') + '</div>'
+      +     (!qualifiedForRank(r.allTimeMatches, r.allTimeSessions) ? '<span class="ms-prov">provisional</span>' : '') + '</div>'
       +   '<div class="ms-meta">' + r.winPct + '% win · ' + r.ptsPct + '% pts · '
       +     r.matches + ' match' + (r.matches===1?'':'es') + ' · ' + r.sessions + ' session' + (r.sessions===1?'':'s') + '</div>'
       + '</div>'
@@ -4581,11 +4590,11 @@ function renderStandings() {
     +   '<button class="roster-manage-link" style="padding-top:0" onclick="openRatingExplain()">Explanation on ratings</button>'
     + '</div>'
     + (ranked.length ? ranked.map(function(r,i){ return row(r,i,true); }).join('')
-                     : '<div class="list-empty">' + (rows.length
-                         ? 'Nobody has reached ' + RATED_MIN_MATCHES + ' matches yet.'
-                         : 'No players in this group yet.') + '</div>')
-    + (unranked.length
-        ? '<div class="ms-group">Not enough matches to rank</div>' + unranked.map(function(r){ return row(r,0,false); }).join('')
+                      : '<div class="list-empty">' + (rows.length
+                          ? 'Nobody qualifies yet — ' + RATED_MIN_MATCHES + '+ matches across 2+ sessions.'
+                          : 'No players in this group yet.') + '</div>')
+     + (unranked.length
+         ? '<div class="ms-group">Not enough to rank</div>' + unranked.map(function(r){ return row(r,0,false); }).join('')
         : '');
 }
 
@@ -4601,8 +4610,8 @@ function closeRatingExplain() {
 // reached the qualification bar there — mirrors exactly how renderStandings() ranks.
 function rankWithin(stats, rating, name) {
   const st = stats[name];
-  if (!st || st.matches < RATED_MIN_MATCHES) return null;
-  const qualified = Object.keys(stats).filter(function(n){ return stats[n].matches >= RATED_MIN_MATCHES; });
+  if (!st || !qualifiedForRank(st.matches, Object.keys(st.sess).length)) return null;
+  const qualified = Object.keys(stats).filter(function(n){ return qualifiedForRank(stats[n].matches, Object.keys(stats[n].sess).length); });
   qualified.sort(function(a,b){ return rating[b]-rating[a] || a.localeCompare(b); });
   return qualified.indexOf(name) + 1;
 }
