@@ -903,7 +903,8 @@ let state = {
   partnerHistory: {},
   opponentHistory: {},
   playerRatings: {},
-  absentNext: new Set()
+  absentNext: new Set(),
+  cyclePlayed: new Set()
 };
 
 // ── PERSISTENCE ───────────────────────────────────────────────────────────────
@@ -919,6 +920,7 @@ function load() {
     if (d) {
       const p = JSON.parse(d);
       p.absentNext = new Set(p.absentNext || []);
+      p.cyclePlayed = p.cyclePlayed || [];
       p.partnerHistory = p.partnerHistory || {};
       p.opponentHistory = p.opponentHistory || {};
       p.playerRatings = p.playerRatings || {};
@@ -930,6 +932,8 @@ function load() {
       if (p.gameMode == null) p.gameMode = 'doubles';
       if (!Array.isArray(p.schedule)) p.schedule = [];
       state = p;
+      state.cyclePlayed = new Set(state.cyclePlayed || []);
+      sanitizeCovered(state.cyclePlayed, activePlayers().map(pl => pl.name));
       // Backfill pointsAgainst/matchPts accurately from history for sessions saved before those fields existed
       if (needsRecalc) recalcAll();
     }
@@ -1038,10 +1042,13 @@ async function claimBaton(code, pin) {
 
   s.absentNext = new Set(s.absentNext || []);
   s.playerRatings = s.playerRatings || {};
+  s.cyclePlayed = s.cyclePlayed || [];
   (s.players || []).forEach(pl => { pl.team = pl.team || 0; pl.skillCategory = pl.skillCategory || null; });
   s.sessionCode = code;
   s.refPin = d.refPin;
   state = s;
+  state.cyclePlayed = new Set(state.cyclePlayed || []);
+  sanitizeCovered(state.cyclePlayed, activePlayers().map(pl => pl.name));
   holdsBaton = true;
   try { localStorage.setItem('mabar_v2', JSON.stringify(state, (k,v) => v instanceof Set ? [...v] : v)); } catch(e) {}
   return { ok: true };
@@ -1062,10 +1069,13 @@ async function reclaimOwnSession(code) {
   try { s = JSON.parse(d.payload); } catch(e) { return { ok: false, msg: 'Could not read that session.' }; }
   s.absentNext = new Set(s.absentNext || []);
   s.playerRatings = s.playerRatings || {};
+  s.cyclePlayed = s.cyclePlayed || [];
   (s.players || []).forEach(pl => { pl.team = pl.team || 0; pl.skillCategory = pl.skillCategory || null; });
   s.sessionCode = code;
   s.refPin = d.refPin;
   state = s;
+  state.cyclePlayed = new Set(state.cyclePlayed || []);
+  sanitizeCovered(state.cyclePlayed, activePlayers().map(pl => pl.name));
   holdsBaton = true;
   try { localStorage.setItem('mabar_v2', JSON.stringify(state, (k,v) => v instanceof Set ? [...v] : v)); } catch(e) {}
   return { ok: true };
@@ -1932,6 +1942,7 @@ function renamePayload(s, fromKey, toName) {
   (s.courts||[]).forEach(function(c){ c.team1 = arr(c.team1); c.team2 = arr(c.team2); });
   s.sittingOut = arr(s.sittingOut);
   s.absentNext = arr(s.absentNext);
+  s.cyclePlayed = arr(s.cyclePlayed);
   (s.schedule||[]).forEach(function(r){
     (r.courts||[]).forEach(function(c){ c.team1 = arr(c.team1); c.team2 = arr(c.team2); });
     r.sittingOut = arr(r.sittingOut);
@@ -2602,14 +2613,25 @@ function teamCap(numCourts) { return state.gameMode === 'singles' ? numCourts : 
 
 // Split a team into blocks of 2 (plus a leftover single if odd), choosing who
 // pairs with whom by fewest past partnerships so a 4+ team varies its sub-pairs.
-function teamBlocks(members) {
+// Coverage directs the split: the unpaired single of an odd team is a covered
+// member when one exists (whole blocks place before leftover singles, so that
+// single is who sits when slots run out), and pairs form uncovered-with-
+// uncovered where possible — every round then seats uncovered members and each
+// cycle terminates. Counts still break ties, preserving sub-pair variety within
+// the same coverage status. Sorts are stable, so shuffle order (random
+// tie-break) survives within each group.
+function teamBlocks(members, covered) {
   const blocks = [], pool = shuffle(members);
+  const freshFirst = (a, b) => (covered.has(a.name) ? 1 : 0) - (covered.has(b.name) ? 1 : 0);
+  pool.sort(freshFirst);
+  if (pool.length % 2 === 1) blocks.push([pool.pop()]);
   while (pool.length >= 2) {
     const first = pool.shift();
-    let bestI = 0, bestC = Infinity;
+    let bestI = 0, bestC = Infinity, bestF = Infinity;
     for (let i=0; i<pool.length; i++) {
+      const f = covered.has(pool[i].name) ? 1 : 0;
       const c = getPartnerCount(first.name, pool[i].name);
-      if (c < bestC) { bestC = c; bestI = i; }
+      if (f < bestF || (f === bestF && c < bestC)) { bestF=f; bestC=c; bestI=i; }
     }
     blocks.push([first, pool.splice(bestI,1)[0]]);
   }
@@ -2617,10 +2639,41 @@ function teamBlocks(members) {
   return blocks;
 }
 
-// Chooses who plays this round, keeping teams intact. `justPlayed` (names on court
-// last round) and `hasPlayed` are passed in because the live round reads them from
-// state while the schedule simulation reads them from its own simulated context.
-function selectForRound(active, numSlots, justPlayed, hasPlayed) {
+// ── COVERAGE CYCLES (rotation fairness) ───────────────────────────────────────
+// The fairness window: every available player plays once before anyone plays
+// twice. `covered` holds the names already played in the current cycle —
+// state.cyclePlayed live, or the simulated copy when planning ahead. Newcomers
+// and returners arrive uncovered (a turn in the remaining cycle, never backlog
+// credit for rounds they missed); remainder repeats are random among the
+// uncovered, so session totals never influence who plays.
+function sanitizeCovered(covered, activeNames) {
+  const active = new Set(activeNames);
+  for (const n of [...covered]) if (!active.has(n)) covered.delete(n);
+  if (!active.size) return covered;
+  // Cycle complete: everyone available has played → start a fresh cycle.
+  for (const n of active) if (!covered.has(n)) return covered;
+  covered.clear();
+  return covered;
+}
+function cycleAdd(names) {
+  const c = cycleSet();
+  names.forEach(n => c.add(n));
+  sanitizeCovered(c, activePlayers().map(p => p.name));
+}
+// Defensive accessor: fresh, reset, loaded, claimed, and admin-edited states
+// must all leave a real Set here, and one missed reset already broke round
+// generation once — so normalize on read instead of trusting every writer.
+function cycleSet() {
+  if (!(state.cyclePlayed instanceof Set)) state.cyclePlayed = new Set(state.cyclePlayed || []);
+  return state.cyclePlayed;
+}
+
+// Chooses who plays this round, keeping teams intact. Coverage cycles drive who
+// is picked: blocks with nobody covered yet in this cycle go first, so the pool
+// is exhausted fairly instead of randomly. `justPlayed` (names on court last
+// round) only breaks ties, keeping a fresh cycle from re-drawing the previous
+// round's exact grouping.
+function selectForRound(active, numSlots, covered, justPlayed) {
   const singles = state.gameMode === 'singles';
   const cap = teamCap(numSlots / perCourt());
   const byTeam = {}, blocks = [];
@@ -2632,14 +2685,23 @@ function selectForRound(active, numSlots, justPlayed, hasPlayed) {
     // Pair-blocks are a doubles idea — singles has no partner to protect, so there
     // teammates stay independent and only the cap + never-face rule constrain them.
     if (singles || m.length === 1) m.forEach(p => blocks.push([p]));
-    else teamBlocks(m).forEach(b => blocks.push(b));
+    else teamBlocks(m, covered).forEach(b => blocks.push(b));
   });
 
-  const rested = shuffle(blocks.filter(b => b.every(p => !justPlayed.has(p.name))));
-  const played = shuffle(blocks.filter(b => b.some (p =>  justPlayed.has(p.name))));
-  // Anti-group-lock swap, as before: stops the same two groups alternating forever.
-  const restedSize = rested.reduce((n,b) => n + b.length, 0);
-  if (restedSize === numSlots && played.length > 0 && active.every(hasPlayed)) played.push(rested.pop());
+  const fresh = shuffle(blocks.filter(b => b.every(p => !covered.has(p.name))));
+  const seen = shuffle(blocks.filter(b => b.some(p => covered.has(p.name))));
+  // Fresh-cycle tie-break, stable-sorted so the shuffle order survives within
+  // ties: deprioritise blocks holding someone from the last round. This keeps
+  // the old anti-group-lock guarantee (e.g. 8 players on 1 court can't
+  // alternate the same two groups forever) without any extra state.
+  const touched = b => b.some(p => justPlayed.has(p.name)) ? 1 : 0;
+  fresh.sort((a, b) => touched(a) - touched(b));
+  // Among already-used blocks, prefer ones still holding an uncovered member
+  // (e.g. a mixed pair from an over-cap team) over fully-covered blocks — seats
+  // more uncovered players without affecting feasibility, since both orders were
+  // already reachable by shuffle alone.
+  const holdsFresh = b => b.some(p => !covered.has(p.name)) ? 0 : 1;
+  seen.sort((a, b) => holdsFresh(a) - holdsFresh(b));
 
   // Whole blocks only — a block that won't fit the room left is skipped, never split.
   const placed = [], spare = [], used = {};
@@ -2655,7 +2717,7 @@ function selectForRound(active, numSlots, justPlayed, hasPlayed) {
   // after every pair-block has had its chance: placing the leftover first spends the
   // team's cap and can strand the team's own pair, leaving the court short.
   const isLeftover = b => !singles && b.length === 1 && b[0].team;
-  const all = [...rested, ...played];
+  const all = [...fresh, ...seen];
   all.filter(b => !isLeftover(b)).forEach(tryPlace);
   all.filter(isLeftover).forEach(tryPlace);
 
@@ -2678,9 +2740,10 @@ function selectForRound(active, numSlots, justPlayed, hasPlayed) {
 // a 3-person team can't split across a single court, for instance. Setup blocks the
 // impossible cases up front, but mid-session edits (adding players, marking someone
 // absent) can still reach one. Drop to fewer courts rather than render a short court.
-function selectPlayable(active, maxCourts, justPlayed, hasPlayed) {
+function selectPlayable(active, maxCourts, covered, justPlayed) {
+  sanitizeCovered(covered, active.map(p => p.name));
   for (let nc = maxCourts; nc >= 1; nc--) {
-    const sel = selectForRound(active, nc * perCourt(), justPlayed, hasPlayed);
+    const sel = selectForRound(active, nc * perCourt(), covered, justPlayed);
     if (sel.toPlay.length === nc * perCourt()) return sel;
   }
   return { toPlay: [], sitting: active };
@@ -2866,7 +2929,7 @@ function generateRound(advance=true) {
     const justPlayed = state.history.length
       ? new Set(state.history[0].courts.flatMap(c => [...c.team1, ...c.team2]))
       : new Set();
-    const { toPlay, sitting } = selectPlayable(active, numCourts, justPlayed, p => p.courtsPlayed > 0);
+    const { toPlay, sitting } = selectPlayable(active, numCourts, cycleSet(), justPlayed);
     state.courts     = formBalancedCourts(toPlay);
     state.sittingOut = sitting.map(p => p.name);
     if (!advance) regenerateSchedule(); // reshuffled current round: upcoming rounds follow from it
@@ -3026,6 +3089,7 @@ function makeSimCtx() {
     partnerHistory: {...state.partnerHistory},
     opponentHistory: {...state.opponentHistory},
     courtsPlayed: cp,
+    covered: new Set(cycleSet()),
     prevCourts
   };
   // The active round (if any) hasn't been submitted yet, so its pairings aren't in
@@ -3043,6 +3107,12 @@ function simRegister(ctx, round) {
     c.team1.forEach(a => c.team2.forEach(b => { const k=pairKey(a,b); ctx.opponentHistory[k]=(ctx.opponentHistory[k]||0)+1; }));
     [...c.team1, ...c.team2].forEach(n => ctx.courtsPlayed[n]=(ctx.courtsPlayed[n]||0)+1);
   });
+  // A simulated round covers its players for the cycle, exactly like a played
+  // round does live — so the whole planned schedule exhausts the roster fairly.
+  round.courts.forEach(c => {
+    [...(c.team1||[]), ...(c.team2||[])].forEach(n => ctx.covered.add(n));
+  });
+  sanitizeCovered(ctx.covered, activePlayers().map(p => p.name));
   ctx.prevCourts = round.courts;
 }
 
@@ -3050,8 +3120,7 @@ function computeRoundSim(ctx) {
   const active = activePlayers();
   const numCourts = Math.min(Math.floor(active.length/perCourt()), state.maxCourts);
   const justPlayed = new Set((ctx.prevCourts||[]).flatMap(c => [...(c.team1||[]), ...(c.team2||[])]));
-  const { toPlay, sitting } = selectPlayable(active, numCourts, justPlayed,
-    p => (ctx.courtsPlayed[p.name]||0) > 0 || justPlayed.has(p.name));
+  const { toPlay, sitting } = selectPlayable(active, numCourts, ctx.covered, justPlayed);
   return { courts: formBalancedCourts(toPlay), sittingOut: sitting.map(p => p.name) };
 }
 
@@ -3173,6 +3242,7 @@ function renderAbsentToggles() {
 
 function toggleAbsent(name, checked) {
   if (checked) state.absentNext.add(name); else state.absentNext.delete(name);
+  sanitizeCovered(cycleSet(), activePlayers().map(p => p.name));
   regenerateSchedule();
   renderAbsentToggles();
   save();
@@ -3287,6 +3357,7 @@ function submitRound() {
     sittingOut: [...state.sittingOut]
   });
   recalcAll();
+  cycleAdd(state.history[0].courts.flatMap(c => [...c.team1, ...c.team2]));
   renderLeaderboard();
   renderHistory();
   document.getElementById('round-banner-text').textContent = `Round ${state.round} saved! Starting round ${state.round+1}…`;
@@ -3635,6 +3706,7 @@ function removePlayerGame(name) {
     c.team2=c.team2.filter(n=>n!==name);
   });
   state.sittingOut = state.sittingOut.filter(n=>n!==name);
+  sanitizeCovered(cycleSet(), activePlayers().map(p => p.name));
   regenerateSchedule();
   renderPlayerListGame(); renderCourts(); renderAbsentToggles(); renderLeaderboard(); save();
 }
@@ -3681,7 +3753,7 @@ function finishSession() {
 
 function resetGame() {
   if (!confirm('Reset everything and start a new game?')) return;
-  state = { players:[], round:0, maxCourts:1, sessionName:'', gameMode:'doubles', schedule:[], bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, playerRatings:{}, absentNext:new Set() };
+  state = { players:[], round:0, maxCourts:1, sessionName:'', gameMode:'doubles', schedule:[], bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, playerRatings:{}, absentNext:new Set(), cyclePlayed:new Set() };
   save(); location.reload();
 }
 
@@ -3984,7 +4056,7 @@ function newSessionFromMenu() {
   document.getElementById('menu-btn').style.display = 'flex';
   document.getElementById('phase-badge').textContent = 'Setup';
   document.getElementById('phase-badge').className = 'badge badge-setup';
-  state = { players:[], round:0, maxCourts:1, sessionName:'', gameMode:'doubles', schedule:[], bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, playerRatings:{}, absentNext:new Set() };
+  state = { players:[], round:0, maxCourts:1, sessionName:'', gameMode:'doubles', schedule:[], bgPhoto:null, bgPhotoY:35, sessionCode:null, isFinished:false, courts:[], sittingOut:[], history:[], partnerHistory:{}, opponentHistory:{}, playerRatings:{}, absentNext:new Set(), cyclePlayed:new Set() };
   setupCourts = 1; setupMode = 'doubles'; setupRated = true;
   document.getElementById('courts-count-display').textContent = setupCourts;
   document.getElementById('session-name-input').value = '';

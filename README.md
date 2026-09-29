@@ -16,7 +16,7 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 
 - **Doubles or Singles** — choose the game mode at setup: classic Americano doubles (2 vs 2, 4 players per court) or Singles (1 vs 1, 2 players per court). Everything — shuffling, standings, live sharing, history editing — works in both modes.
 - **Drop a court to singles mid-round** — every player slot on the live Courts screen has a swap button. Tap it and, alongside swapping in someone resting, choose **🚫 No partner** to let that player sit out mid-round without a replacement — their teammate (or a lone opponent) just plays on, turning that court into a 1v1 if both sides do it. A light "+ partner" placeholder appears in their spot in case someone becomes available to fill it before the round ends. This only edits the round already on court — the shuffle itself never creates an uneven or singles court on its own, so every later round is still drawn as full doubles.
-- **Smart shuffling** — players who sat out last round get priority; players who just played are deprioritized. Within each group, selection is random. Repeat partnerships and repeat opponents are minimised across rounds using match history (in Singles, repeat opponents are minimised). For sessions up to 3 courts, partner pairings are chosen by checking every possible pairing for the round and picking the one with the fewest repeats, rather than a faster but less thorough one-pair-at-a-time guess.
+- **Smart shuffling** — coverage cycles: everyone available plays once before anyone plays twice, so a 16-player single-court session rotates in blocks of four instead of re-fielding the same names. Newcomers and returners join the current cycle as uncovered (a turn in what's left, never backlog credit), remainder repeats are random, and completed cycles reset automatically. Repeat partnerships and repeat opponents are minimised across rounds using match history (in Singles, repeat opponents are minimised). For sessions up to 3 courts, partner pairings are chosen by checking every possible pairing for the round and picking the one with the fewest repeats, rather than a faster but less thorough one-pair-at-a-time guess.
 - **Full 12-round schedule** — "Generate Matches" creates round 1 plus 11 upcoming rounds you can scroll through, so everyone knows what's coming. Each upcoming round has its own 🔀 redraw button, **＋ Add round** extends the plan past 12, and the whole schedule updates live when you mark absences, swap players, or add someone mid-session. The schedule is guaranteed accurate — the round you play is exactly the one shown.
 - **Play rounds in any order** — tap **▶ Play** on any upcoming round to play it now (e.g. someone stepped out and a later round fits who's on court). Your current lineup is parked in that round's slot — marked **⏸ parked** — with any typed scores kept, waiting until you come back to it. Nothing else is reshuffled.
 - **Club roster** — the setup screen offers your saved players as tappable chips instead of making you retype names. Tapping one brings in that player's canonical spelling and saved gender. The search box doubles as add-new, and typing a name close to an existing one (e.g. "Lukas" when "Lucas" is in the roster) asks whether you meant the existing player before creating a second one. Regulars show by default with occasional players one tap away, but **search always reaches everyone** — nobody is hidden behind a threshold. The roster maintains itself: starting a session records its line-up, so new players are added and returning ones keep their spelling. Correcting a player's ♂/♀ in a session updates the roster too, so the fix carries into every future session instead of being redone each time.
@@ -63,12 +63,12 @@ Americano is a rotating doubles format where partners shuffle every round and pl
 
 ## How the shuffle works
 
-Each round, active players are split into two pools:
+Each session tracks a **coverage cycle**: the set of available players who have already played in the current cycle. Every round fills its slots from the uncovered players first (shuffled), so the roster is exhausted fairly instead of randomly — 16 players on 1 court rotate as four distinct rounds, and nobody plays twice while someone else hasn't played once. When everyone available is covered, the cycle resets and a new one begins.
 
-- **Preferred pool** — players who sat out last round (or have never played). Always fill slots first.
-- **Fallback pool** — players who just played last round. Fill remaining slots only if needed.
-
-Selection within each pool is random, so no priority debt accumulates and late arrivals don't get unfairly favoured with consecutive rounds. For exact group sizes where the preferred pool would equal the number of slots (e.g. 8 players, 1 court), one player is swapped between pools once everyone has had at least one turn — this prevents the same two groups from alternating forever.
+- Joining or returning mid-session adds you to the current cycle as uncovered — you become eligible for the very next round (the upcoming schedule redraws automatically), but you get no credit for rounds played before you arrived, so a last-hour arrival can't queue-jump.
+- Marking someone absent (or removing them) rebuilds the schedule around who's left; if everyone remaining is already covered, a fresh cycle starts immediately.
+- Remainder slots (e.g. 14 players need 2 repeats per 4-round cycle) are drawn randomly among the uncovered, and rotate by themselves since the next cycle resets everyone.
+- Fixed pairs/teams are seated as indivisible units: an odd team's unpaired member is whoever is already covered when possible, and teammates pair uncovered-with-uncovered where possible, so teams never stall a cycle.
 
 Once players are selected, the app minimises repeat partnerships and promotes former partners to face each other as opponents.
 
@@ -182,6 +182,13 @@ open index.html   # macOS
 ---
 
 ## Changelog
+
+### v3.11 (September 2026)
+
+**Coverage-cycle rotation (fairness fix for big sessions on few courts)**
+- Replaced the one-round-deep preferred/fallback pool with coverage cycles: a per-session `cyclePlayed` set, uncovered-first selection in `selectForRound`, cycle state carried through the 12-round schedule simulation, updates on round submit/absence/player removal, and backfill for older sessions.
+- Fixed during validation: odd-team leftovers and even-team sub-pairs now split coverage-first in `teamBlocks`, so an uncovered member can't sit repeatedly behind cap-blocked pairs — and used blocks still holding an uncovered member place first.
+- Validated per the handover protocol: verbatim-extracted selection code driven through ~1,300 randomized invariant trials (exact partition at 16 and 14 players, mid-cycle joins, fixed pairs, absences, anti-lock, singles, odd/even teams) — all pass; plus an old-vs-new replay of the real "Selasa Lagi" 22 Sept session (16 players, 1 court): skip-rounds 6 → 0, the recorded 7-round sit-out (Lucas) plays in rounds 8–12 in 93/100 simulated trials, and the open cycle completes with 8 distinct players across rounds 8–9 in 100/100 trials.
 
 ### v3.10 (August 2026)
 
