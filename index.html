@@ -47,6 +47,15 @@
 
   .court-card { background: #fff; border-radius: 14px; border: 0.5px solid #e5e5e0; padding: 1rem 1.1rem; margin-bottom: .875rem; }
   .court-label { font-size: 12px; font-weight: 700; color: #5b4fcf; text-transform: uppercase; letter-spacing: .07em; }
+  .wc-wrap { margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .wc-pct { font-size: 11px; font-weight: 700; line-height: 1; min-width: 36px; flex-shrink: 0; }
+  .wc-wrap > .wc-pct:first-child { text-align: right; }
+  .wc-wrap > .wc-pct:last-child { text-align: left; }
+  .wc-pct.wc-fav { color: #5b4fcf; }
+  .wc-pct.wc-und { color: #aaa; }
+  .wc-bar { display: flex; flex: none; width: 120px; height: 3px; border-radius: 2px; overflow: hidden; background: #e5e5e0; }
+  .wc-fill-a, .wc-fill-b { height: 100%; }
+  .wc-bar.wc-prov { opacity: .45; }
   .vs-row { display: flex; align-items: center; gap: 6px; margin-top: .625rem; }
   .team { flex: 1; min-width: 0; }
   .score-box { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
@@ -1300,6 +1309,14 @@ function pvScore(val) {
 let pvLiveSession = null;
 let pvLiveRound = null;
 let pvLiveSortMode = 'points';
+let pvLeagueReq = false;
+// Spectator provisional stars need the league snapshot; fetch once per page load
+// (never touches referee views) and re-render the live card when it lands.
+function pvEnsureLeague() {
+  if (pvLeagueReq || leagueSnapshot) return;
+  pvLeagueReq = true;
+  getLeague().then(function(l){ leagueSnapshot = l; if (pvLiveSession) renderPlayerLive(pvLiveSession, pvLiveRound); }).catch(function(){});
+}
 
 // Mirrors setSortMode/setPlayerViewSort's naming, but for the live (not-yet-finished)
 // spectator view specifically — its own mode so a spectator's choice while a session is
@@ -1338,6 +1355,8 @@ function renderPlayerLive(s, round) {
     </div>`;
 
   (s.courts || []).forEach((c, i) => {
+    const wc = (s.isRated !== false) ? winChanceHtml(c.team1, c.team2, s.playerRatings || {}, s.players || []) : '';
+    if (wc && !leagueSnapshot) pvEnsureLeague();
     html += `
       <div class="pv-court-card">
         <span class="court-label">Court ${i + 1}</span>
@@ -1346,6 +1365,7 @@ function renderPlayerLive(s, round) {
           <div class="pv-score-box">${pvScore(c.score1)}<br><span style="font-size:12px;color:#ccc;font-weight:400">vs</span><br>${pvScore(c.score2)}</div>
           <div class="pv-team" style="text-align:right">${(c.team2 || []).join('<br>')}</div>
         </div>
+        ${wc}
       </div>`;
   });
 
@@ -2575,6 +2595,53 @@ function getRating(name) {
   return r === undefined ? ELO_START : r;
 }
 
+// ── WIN CHANCE (pre-match expectation, display-only) ─────────────────────────
+// Same Elo expected-score as runEloPass, on the same frozen ratings the shuffle
+// uses. Hide on casual / unknown — 50/50 must mean truly even, never "no data".
+// Provisional = '*' on the affected side, no extra row.
+function wcIsProv(name) {
+  if (!leagueSnapshot || !leagueSnapshot.allTime || !leagueSnapshot.allTime.stats) return false;
+  const st = leagueSnapshot.allTime.stats[name];
+  if (!st) return true;
+  return !qualifiedForRank(st.matches, Object.keys(st.sess || {}).length);
+}
+function winChanceHtml(t1names, t2names, rMap, players) {
+  const a = (t1names || []).filter(Boolean), b = (t2names || []).filter(Boolean);
+  if (!a.length || !b.length) return '';
+  // Uneven teams (2v1 after a drop-to-singles): team-average Elo doesn't model
+  // covering extra court, so any number would mislead — show '?' at same height.
+  if (a.length !== b.length) {
+    return '<div class="wc-wrap" aria-label="Win chance unavailable for uneven teams">'
+      + '<span class="wc-pct wc-und">?</span>'
+      + '<div class="wc-bar"><div class="wc-fill-a" style="width:50%;background:#e5e5e0"></div>'
+      + '<div class="wc-fill-b" style="width:50%;background:#e5e5e0"></div></div>'
+      + '<span class="wc-pct wc-und">?</span></div>';
+  }
+  const hasMap = rMap && Object.keys(rMap).length > 0;
+  const hasSkill = (players || []).some(function(p){ return p.skillCategory && (a.indexOf(p.name) !== -1 || b.indexOf(p.name) !== -1); });
+  if (!hasMap && !hasSkill) return '';
+  const rOf = function(n) {
+    const p = (players || []).find(function(x){ return x.name === n; });
+    if (p && p.skillCategory) return SKILL_ANCHORS[p.skillCategory];
+    const r = rMap ? rMap[n] : undefined;
+    return r === undefined ? ELO_START : r;
+  };
+  const avgA = a.reduce(function(s,n){ return s + rOf(n); }, 0) / a.length;
+  const avgB = b.reduce(function(s,n){ return s + rOf(n); }, 0) / b.length;
+  const eA = 1 / (1 + Math.pow(10, (avgB - avgA) / 400));
+  const pA = Math.round(eA * 100), pB = 100 - pA;
+  const provA = a.some(wcIsProv), provB = b.some(wcIsProv);
+  const favA = pA >= pB;
+  const colFav = '#5b4fcf', colUnd = '#e5e5e0';
+  return '<div class="wc-wrap" aria-label="Win chance ' + pA + ' percent vs ' + pB + ' percent' + ((provA || provB) ? ', provisional' : '') + '">'
+    + '<span class="wc-pct ' + (favA ? 'wc-fav' : 'wc-und') + '">' + pA + '%' + (provA ? '*' : '') + '</span>'
+    + '<div class="wc-bar' + ((provA || provB) ? ' wc-prov' : '') + '">'
+    + '<div class="wc-fill-a" style="width:' + pA + '%;background:' + (favA ? colFav : colUnd) + '"></div>'
+    + '<div class="wc-fill-b" style="width:' + pB + '%;background:' + (!favA ? colFav : colUnd) + '"></div>'
+    + '</div>'
+    + '<span class="wc-pct ' + (!favA ? 'wc-fav' : 'wc-und') + '">' + pB + '%' + (provB ? '*' : '') + '</span></div>';
+}
+
 function teamGender(team) { // team: array of player objects → 'M' | 'F' | 'X' (mixed)
   if (team.every(p => p.gender === 'F')) return 'F';
   if (team.every(p => p.gender !== 'F')) return 'M';
@@ -2984,6 +3051,7 @@ function renderCourts() {
             : (state.gameMode==='doubles' ? playerSlotHtml(i,'team2',1,null,false) : '')}
         </div>
       </div>
+      ${(state.isRated !== false) ? winChanceHtml(c.team1, c.team2, state.playerRatings, state.players) : ''}
     </div>`).join('');
 
   const soCard = document.getElementById('sitting-out-card');
