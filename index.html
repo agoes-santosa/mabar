@@ -346,7 +346,7 @@
   .ms-mode { flex: 1; border: none; background: none; border-radius: 8px; padding: 9px 6px; font-size: 13.5px; font-weight: 700; color: #888; cursor: pointer; }
   .ms-mode.active { background: #fff; color: #5b4fcf; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
   /* Gender filter: same pill component, one size down, so it reads as refining the
-     This month/All time row above it rather than a second, competing control. */
+     This month/Last 6 months row above it rather than a second, competing control. */
   .ms-modes-sub { margin-bottom: .625rem; }
   .ms-modes-sub .ms-mode { font-size: 12.5px; padding: 7px 6px; }
   .ms-modes-sub .ms-mode .mk { opacity: .7; margin-right: 3px; vertical-align: middle; }
@@ -419,7 +419,7 @@
       <div class="menu-tile-icon">🏅</div>
       <div class="menu-tile-main">
         <div class="menu-tile-title">Leaderboard</div>
-        <div class="menu-tile-sub">Monthly ratings and all-time rankings</div>
+        <div class="menu-tile-sub">Monthly and last-6-months ratings</div>
       </div>
       <span class="menu-chevron">›</span>
     </button>
@@ -798,6 +798,20 @@
   </div>
 </div>
 
+<div id="newsession-pin-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;z-index:220;padding:1.5rem">
+  <div style="background:#fff;border-radius:16px;padding:1.5rem 1.35rem;max-width:330px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.15)">
+    <div style="width:44px;height:44px;border-radius:50%;background:#f0effe;color:#5b4fcf;display:flex;align-items:center;justify-content:center;font-size:19px;margin-bottom:.75rem">🔒</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">New session</div>
+    <div style="font-size:13px;color:#888;line-height:1.55;margin-bottom:1rem">Enter PIN to create a new session.</div>
+    <input type="password" inputmode="numeric" maxlength="4" id="newsession-pin-input" placeholder="• • • •"
+           style="text-align:center;letter-spacing:.3em;font-size:20px"
+           onkeydown="if(event.key==='Enter')submitNewSessionPin()" />
+    <div id="newsession-pin-error" style="display:none;color:#dc2626;font-size:13px;margin-top:.5rem;line-height:1.5"></div>
+    <button class="btn btn-primary btn-full" style="margin-top:.875rem" id="newsession-pin-submit" onclick="submitNewSessionPin()">Continue</button>
+    <button style="display:block;width:100%;text-align:center;margin-top:.75rem;font-size:13px;color:#888;background:none;border:none;cursor:pointer;padding:6px" onclick="closeNewSessionPin()">Cancel</button>
+  </div>
+</div>
+
 <div id="roster-manage" style="display:none">
   <div class="rm-sheet">
     <div class="rm-head">
@@ -823,8 +837,8 @@
     </div>
     <div style="padding:1.1rem;font-size:13.5px;color:#555;line-height:1.65">
       <p style="margin-bottom:.75rem">Ratings use <b>Elo</b> — the same system chess uses, starting everyone at 1000. Before each match, both sides' ratings predict who <i>should</i> win — beat a stronger opponent and you gain more, lose to a weaker one and you lose more. Every point gained is lost by someone else, so the rating pool never inflates.</p>
-      <p style="margin-bottom:.75rem"><b>This month</b> restarts everyone at 1000 on the 1st, so a rough month never follows you around — above 1000 means you've gained ground since the reset. <b>All time</b> never resets; it's the long-run number across every rated session.</p>
-      <p style="margin:0">Both need <b><span id="rating-explain-min"></span>+ matches across 2+ sessions</b> in their window (that month, or ever) before they're ranked — fewer than that and you're marked <b>provisional</b>, still shown, just not ranked yet, so one big session alone can't top the table.</p>
+      <p style="margin-bottom:.75rem"><b>This month</b> restarts everyone at 1000 on the 1st, so a rough month never follows you around — above 1000 means you've gained ground since the reset. <b>Last 6 months</b> never resets but weights recent form: results under 3 months old count fully, older ones fade, and past 6 months they stop counting — so the number reflects current form, and numbers shift slightly as time passes even with no new games.</p>
+      <p style="margin:0">Both need <b><span id="rating-explain-min"></span>+ matches across 2+ sessions</b> in their window (that month, or the last 6 months) before they're ranked — fewer than that and you're marked <b>provisional</b>, still shown, just not ranked yet, so one big session alone can't top the table.</p>
     </div>
   </div>
 </div>
@@ -2024,6 +2038,64 @@ const ROSTER_PIN = '1234';
 const ROSTER_PIN_TRIES = 3;
 let rosterPinTries = 0;
 let rosterUnlocked = false;   // holds for this page visit; a reload re-locks
+
+// PIN in front of New session, to limit usage for now. The live value lives in
+// Firestore (`clubs/cmtc` doc, field `newSessionPin`) so it can be changed from
+// the admin tool; this default applies when unset or offline. Same honest
+// trade-off as the other PINs: friction, not real security.
+const NEW_SESSION_PIN_DEFAULT = '0610';
+const NEW_SESSION_PIN_TRIES = 3;
+let newSessionPinTries = 0;
+let newSessionUnlocked = false;   // holds for this page visit; a reload re-locks
+
+// Fresh read per tap (never cached across taps), so a PIN changed from the
+// admin tool takes effect immediately. Falls back to the default when offline.
+function fetchNewSessionPin() {
+  return db.collection('clubs').doc(CLUB_ID).get().then(function(doc){
+    const v = doc.exists && doc.data() ? doc.data().newSessionPin : null;
+    return (/^\d{4}$/.test(v || '')) ? v : NEW_SESSION_PIN_DEFAULT;
+  }).catch(function(){ return NEW_SESSION_PIN_DEFAULT; });
+}
+
+function requestNewSession() {
+  if (newSessionUnlocked) { openNewSessionSetup(); return; }
+  newSessionPinTries = 0;
+  fetchNewSessionPin();   // resolves well before a PIN is typed and submitted
+  const inp = document.getElementById('newsession-pin-input');
+  const err = document.getElementById('newsession-pin-error');
+  if (inp) inp.value = '';
+  if (err) err.style.display = 'none';
+  document.getElementById('newsession-pin-overlay').style.display = 'flex';
+  setTimeout(function(){ if (inp) inp.focus(); }, 50);
+}
+
+function closeNewSessionPin() {
+  document.getElementById('newsession-pin-overlay').style.display = 'none';
+}
+
+async function submitNewSessionPin() {
+  const inp = document.getElementById('newsession-pin-input');
+  const err = document.getElementById('newsession-pin-error');
+  const btn = document.getElementById('newsession-pin-submit');
+  const val = (inp.value || '').trim();
+  const oldLabel = btn.textContent;
+  btn.textContent = 'Checking…'; btn.disabled = true;
+  const pin = await fetchNewSessionPin();
+  btn.textContent = oldLabel; btn.disabled = false;
+  if (val === pin) {
+    newSessionUnlocked = true;
+    closeNewSessionPin();
+    openNewSessionSetup();
+    return;
+  }
+  newSessionPinTries++;
+  const left = NEW_SESSION_PIN_TRIES - newSessionPinTries;
+  if (left <= 0) { closeNewSessionPin(); return; }   // out of tries — back to menu
+  err.textContent = 'That PIN doesn\'t match — ' + left + ' attempt' + (left === 1 ? '' : 's') + ' left.';
+  err.style.display = 'block';
+  inp.value = '';
+  inp.focus();
+}
 
 function requestManageRoster() {
   if (rosterUnlocked) { openManageRoster(); return; }
@@ -4118,6 +4190,11 @@ function showMenu() {
 }
 
 function newSessionFromMenu() {
+  if (newSessionUnlocked) { openNewSessionSetup(); return; }
+  requestNewSession();
+}
+
+function openNewSessionSetup() {
   if (hasSessionInProgress() && !confirm('You have a session in progress. Starting a new one will replace it. Continue?')) return;
   hideAllViews();
   document.getElementById('view-setup').style.display = 'block';
@@ -4299,9 +4376,22 @@ async function showHistory() {
 const ELO_START = 1000;
 const ELO_K = 32;
 const RATED_MIN_MATCHES = 10;   // roughly one session's worth of play
+const DECAY_GRACE_DAYS = 90;    // full weight under 3 months (VRS-style Age Weight)
+const DECAY_CUTOFF_DAYS = 180;  // zero weight past 6 months
+
+// Recency weight for one session: 1 under grace, linear ramp to 0 at cutoff.
+// Age anchors to today at read time, so numbers drift as time passes even with
+// no new games — the "Last 6 months" label + Explanation popup say so.
+function decayWeight(when) {
+  if (!when) return 1;
+  const age = Math.max(0, (Date.now() - when.getTime()) / 86400000);
+  if (age <= DECAY_GRACE_DAYS) return 1;
+  if (age >= DECAY_CUTOFF_DAYS) return 0;
+  return (DECAY_CUTOFF_DAYS - age) / (DECAY_CUTOFF_DAYS - DECAY_GRACE_DAYS);
+}
 
 let standingsMonths = [], standingsIdx = 0, standingsData = null, standingsPlayer = null;
-let standingsMode = 'month';   // 'month' (resets each month) | 'alltime' (never resets)
+let standingsMode = 'month';   // 'month' (resets each month) | 'alltime' (rolling last 6 months, decayed)
 let standingsGender = 'all';   // 'all' | 'M' | 'F' — filters which players rank, not how ratings are computed
 
 function monthKeyOf(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
@@ -4338,9 +4428,9 @@ async function fetchSessionsForRating() {
 // round, so court 1's result never feeds into court 2's expectation the same round.
 //
 // This runs twice over different inputs, which is what produces the two ratings:
-//   • once over every rated session      -> the all-time rating (never resets)
+//   • once over every rated session, decayed  -> the rolling last-6-months rating
 //   • once per calendar month, in isolation -> that month's rating (restarts at 1000)
-function runEloPass(sessions) {
+function runEloPass(sessions, useDecay) {
   const rating = {}, stats = {}, bySession = {}, matches = [];
   const touch = function(n){ if (rating[n]===undefined) rating[n] = ELO_START; };
   const statOf = function(n){
@@ -4351,6 +4441,9 @@ function runEloPass(sessions) {
   sessions.forEach(function(s){
     const info = { rated:true, start:{}, end:{}, delta:{} };
     bySession[s.code] = info;
+    // Monthly passes always run undecayed (a past month replayed today would
+    // otherwise collapse to flat 1000s); only the rolling pass decays.
+    const w = useDecay ? decayWeight(s.when) : 1;
 
     s.rounds.forEach(function(round, roundIdx){
       const snap = {};
@@ -4371,7 +4464,7 @@ function runEloPass(sessions) {
         const max = Math.max(c.s1, c.s2);
         const credit = function(names, mine, theirs, foes, act, e) {
           names.forEach(function(n){
-            const gain = ELO_K * (act - e);
+            const gain = ELO_K * w * (act - e);
             delta[n] = (delta[n]||0) + gain;
             const st = statOf(n);
             st.matches++; st.pf += mine; st.pa += theirs; st.maxp += max; st.sess[s.code] = 1;
@@ -4401,12 +4494,13 @@ function runEloPass(sessions) {
 // Two ratings, deliberately:
 //   • MONTHLY  restarts everyone at 1000 on the 1st, so a bad month doesn't follow you
 //     around and each month is a fresh race worth turning up for.
-//   • ALL-TIME never resets, so there is still one number that means something over the
-//     long run — which is what stops the monthly reset making ratings meaningless.
+//   • LAST 6 MONTHS never resets but weights recent form (full under 3 months,
+//     fading to zero at 6), so there is still one number with a long memory —
+//     which is what stops the monthly reset making ratings meaningless.
 function computeLeague(sessions) {
   const rated = sessions.filter(function(s){ return s.rated; });
 
-  const allTime = runEloPass(rated);
+  const allTime = runEloPass(rated, true);
 
   const grouped = {};
   rated.forEach(function(s){
@@ -4416,13 +4510,13 @@ function computeLeague(sessions) {
 
   const months = {};
   Object.keys(grouped).forEach(function(k){
-    const pass = runEloPass(grouped[k]);
+    const pass = runEloPass(grouped[k], false);
     months[k] = { key:k, sessions:grouped[k].length, rating:pass.rating,
                   stats:pass.stats, matches:pass.matches, bySession:pass.bySession };
   });
 
   // Session summaries show the MONTHLY rating, so a session's numbers agree with the
-  // month it belongs to rather than with a separate all-time figure.
+  // month it belongs to rather than with the separate rolling figure.
   const bySession = {};
   sessions.forEach(function(s){
     if (!s.rated) { bySession[s.code] = { rated:false }; return; }
@@ -4444,7 +4538,7 @@ async function getLeague(force) {
   return _leagueCache;
 }
 
-// Snapshots every player's current all-time rating into state.playerRatings so the
+// Snapshots every player's current rolling rating into state.playerRatings so the
 // shuffle (getRating) can run synchronously for the rest of the session — ratings
 // don't move again mid-session even as real match results come in. If the fetch fails
 // (offline at courtside), leave whatever's already cached; getRating falls back to
@@ -4568,7 +4662,7 @@ function standingsPlayerGender(name) {
 function standingsModeToggle() {
   return '<div class="ms-modes">'
     + '<button class="ms-mode' + (standingsMode==='month'?' active':'') + '" onclick="setStandingsMode(\'month\')">This month</button>'
-    + '<button class="ms-mode' + (standingsMode==='alltime'?' active':'') + '" onclick="setStandingsMode(\'alltime\')">All time</button>'
+    + '<button class="ms-mode' + (standingsMode==='alltime'?' active':'') + '" onclick="setStandingsMode(\'alltime\')">Last 6 months</button>'
     + '</div>'
     + '<div class="ms-modes ms-modes-sub">'
     +   '<button class="ms-mode' + (standingsGender==='all'?' active':'') + '" onclick="setStandingsGender(\'all\')">All</button>'
@@ -4621,7 +4715,7 @@ function renderStandings() {
     // A monthly rating starts from 1000, so the number IS the change — no arrow needed.
     // The secondary slot carries the other rating instead, so both are always visible.
     const sub = monthly
-      ? (r.alt === null ? '' : '<div class="ms-alt">all-time ' + Math.round(r.alt) + '</div>')
+      ? (r.alt === null ? '' : '<div class="ms-alt">6-mo ' + Math.round(r.alt) + '</div>')
       : (r.last ? '<div class="ms-alt">last ' + r.last.toLocaleDateString('en-US',{month:'short',year:'numeric'}) + '</div>' : '');
     return '<div class="ms-row' + (showRank && i===0 ? ' top1' : '') + '" style="cursor:pointer"'
       + ' onclick="openStandingsPlayer(\'' + jsAttr(r.name) + '\')">'
@@ -4647,7 +4741,7 @@ function renderStandings() {
       +   '<button class="ms-picker-btn" onclick="stepStandingsMonth(-1)"' + (standingsIdx <= 0 ? ' disabled' : '') + '>›</button>'
       + '</div>'
     : '<div class="ms-picker"><div style="flex:1">'
-      +   '<div class="ms-picker-label">All-time Leaderboard</div>'
+      +   '<div class="ms-picker-label">Last 6 Months Leaderboard</div>'
       +   '<div class="ms-picker-sub">' + standingsMonths.length + ' month' + (standingsMonths.length===1?'':'s')
       +     ' · ' + rows.length + ' players</div></div></div>';
 
@@ -4716,7 +4810,7 @@ function renderStandingsPlayer() {
   const key = standingsMonths[standingsIdx];
   const m = standingsData.months[key];
   const at = standingsData.allTime;
-  const scope = monthly ? m : at;              // month bucket, or the all-time pass
+  const scope = monthly ? m : at;              // month bucket, or the decayed rolling pass
   const name = standingsPlayer;
   const st = scope.stats[name];
   if (!st) { closeStandingsPlayer(); return; }
@@ -4784,7 +4878,7 @@ function renderStandingsPlayer() {
 
   const rating = scope.rating[name];
   const other = monthly ? at.rating[name] : (m.rating[name] === undefined ? null : m.rating[name]);
-  const otherLabel = monthly ? 'all-time' : monthLabelOf(key);
+  const otherLabel = monthly ? 'last 6 months' : monthLabelOf(key);
 
   const monthRank = rankWithin(m.stats, m.rating, name);
   const atRank = rankWithin(at.stats, at.rating, name);
@@ -4799,10 +4893,10 @@ function renderStandingsPlayer() {
     + '<div class="pd-hero">'
     +   '<div class="pd-name">' + esc(name) + '</div>'
     +   '<div class="pd-rating">' + Math.round(rating) + '</div>'
-    +   '<div class="pd-ranks">' + rankChip(monthRank, 'this month') + rankChip(atRank, 'all-time') + '</div>'
+    +   '<div class="pd-ranks">' + rankChip(monthRank, 'this month') + rankChip(atRank, 'last 6 mo') + '</div>'
     +   (other === null ? ''
         : '<div class="pd-sub" style="margin-top:2px">' + otherLabel + ' rating ' + Math.round(other) + '</div>')
-    +   '<div class="pd-sub">' + (monthly ? monthLabelOf(key) : 'All time') + ' · '
+    +   '<div class="pd-sub">' + (monthly ? monthLabelOf(key) : 'Last 6 months') + ' · '
     +     (st.matches ? Math.round(st.wins/st.matches*100) : 0) + '% win · '
     +     (st.maxp ? Math.round(st.pf/st.maxp*100) : 0) + '% pts · '
     +     st.matches + ' match' + (st.matches===1?'':'es') + ' · '

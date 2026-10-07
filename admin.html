@@ -89,6 +89,16 @@
   <div id="view-list">
     <div class="note">Lists every session in Firestore, newest month first. Tap one to fix its scores, players, settings — or delete it. Ratings reflow automatically after you save, since they are recomputed from history on every read. Nothing here touches <code>index.html</code>.</div>
     <div id="list-msg" class="msg"></div>
+    <div class="card">
+      <div class="card-title">App settings</div>
+      <label class="fld" for="f-pin">New session PIN</label>
+      <div class="row">
+        <input type="text" id="f-pin" maxlength="4" inputmode="numeric" placeholder="0610" style="flex:1;text-align:center;letter-spacing:.2em" />
+        <button class="mini-btn primary" id="pin-save-btn" onclick="savePin()">Save</button>
+      </div>
+      <div style="font-size:12px;color:#999;line-height:1.5;margin-top:4px">Gates <b>New session</b> in the main app. Exactly 4 digits. Takes effect immediately.</div>
+      <div id="pin-msg" style="font-size:13px;line-height:1.5;margin-top:6px;display:none"></div>
+    </div>
     <div style="display:flex;gap:8px;margin-bottom:.875rem">
       <button class="btn btn-secondary btn-sm" style="flex:1" onclick="loadList()">↻ Refresh list</button>
     </div>
@@ -204,6 +214,7 @@ function submitPin() {
     sessionStorage.setItem('session_admin_ok', '1');
     document.getElementById('pin-overlay').style.display = 'none';
     loadList();
+    loadPin();
   } else {
     const e = document.getElementById('pin-error');
     e.textContent = 'Wrong PIN.';
@@ -291,6 +302,38 @@ function recompute(S) {
       if (p) p.rounds++;
     });
   });
+}
+
+// App settings live on the club doc (same 'cmtc' as index.html's CLUB_ID).
+// The doc may not exist yet — then the main app simply uses its default PIN.
+function clubDoc() { return db.collection('clubs').doc('cmtc'); }
+async function loadPin() {
+  const inp = document.getElementById('f-pin');
+  try {
+    const doc = await clubDoc().get();
+    const v = doc.exists && doc.data() ? doc.data().newSessionPin : null;
+    inp.value = (/^\d{4}$/.test(v || '')) ? v : '0610';
+  } catch (e) { inp.value = '0610'; }
+}
+async function savePin() {
+  const btn = document.getElementById('pin-save-btn');
+  const msg = document.getElementById('pin-msg');
+  const v = (document.getElementById('f-pin').value || '').trim();
+  msg.style.display = 'none';
+  if (!/^\d{4}$/.test(v)) {
+    msg.textContent = 'PIN must be exactly 4 digits.';
+    msg.style.display = 'block'; msg.style.color = '#991b1b';
+    return;
+  }
+  btn.textContent = 'Saving…'; btn.disabled = true;
+  try {
+    await clubDoc().set({ newSessionPin: v }, { merge: true });
+    msg.textContent = 'Saved — the main app now asks for this PIN on New session.';
+    msg.style.display = 'block'; msg.style.color = '#15803d';
+  } catch (e) {
+    msg.textContent = 'Save failed: ' + (e && e.message ? e.message : e);
+    msg.style.display = 'block'; msg.style.color = '#991b1b';
+  } finally { btn.textContent = 'Save'; btn.disabled = false; }
 }
 
 // ── LIST ──────────────────────────────────────────────────────────────────────
@@ -720,6 +763,7 @@ async function deleteSession() {
 document.getElementById('f-mode').addEventListener('change', () => { readRoundsFromDom(); renderRounds(); refreshPreview(); });
 
 loadList();
+loadPin();
 </script>
 </body>
 </html>
